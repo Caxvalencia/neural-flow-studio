@@ -7,6 +7,7 @@
         [class.webgpu]="webgpuReady()"
         [class.fallback]="backendStatus() === 'fallback'"
         [class.error]="backendStatus() === 'error'"
+        [title]="backendMessage()"
       >
         {{ backend() }}
       </span>
@@ -19,9 +20,10 @@
         [ngModel]="preferredBackend()"
         (ngModelChange)="changeBackend($event)"
         [disabled]="training() || backendSwitching()"
+        title="Selecciona el motor de TensorFlow.js. Si no esta disponible, la app usa un fallback compatible."
       >
         @for (option of backendOptions; track option.id) {
-          <option [value]="option.id">{{ option.label }}</option>
+          <option [value]="option.id" [title]="option.description">{{ option.label }}</option>
         }
       </select>
     </div>
@@ -33,11 +35,27 @@
 
   <div class="panel-section">
     <h3>Training Data</h3>
+
+    <div class="dataset-loader">
+      <button
+        class="btn secondary"
+        (click)="openDatasetModal()"
+        title="Abre datasets publicos listos para cargar como datos de entrenamiento"
+      >
+        <span class="material-symbols-rounded">dataset</span>
+        Load Dataset
+      </button>
+      @if (loadedDatasetLabel()) {
+        <span class="dataset-loaded">{{ loadedDatasetLabel() }}</span>
+      }
+    </div>
+
     <div class="data-format-tabs">
       <button
         class="tab-btn"
         [class.active]="dataFormat() === 'csv'"
         (click)="dataFormat.set('csv')"
+        title="Carga datos pegando filas CSV: entradas seguidas de salidas esperadas"
       >
         CSV
       </button>
@@ -45,6 +63,7 @@
         class="tab-btn"
         [class.active]="dataFormat() === 'manual'"
         (click)="dataFormat.set('manual')"
+        title="Genera datos de ejemplo automaticamente usando la forma del grafo actual"
       >
         Manual
       </button>
@@ -56,14 +75,23 @@
         [value]="dataInput()"
         (input)="dataInput.set($any($event.target).value)"
         placeholder="CSV: input values followed by output values&#10;Use Generate Sample Data to match the current graph shape"
+        title="Pega datos CSV. Cada fila debe tener primero los valores de entrada y despues los valores objetivo."
         (blur)="parseCSVData()"
       ></textarea>
       <div class="data-actions">
-        <button class="btn secondary" (click)="generateSampleData()">
+        <button
+          class="btn secondary"
+          (click)="generateSampleData()"
+          title="Genera un dataset de ejemplo compatible con las dimensiones del grafo"
+        >
           <span class="material-symbols-rounded">data_object</span>
           Generate Sample Data
         </button>
-        <button class="btn secondary" (click)="parseCSVData()">
+        <button
+          class="btn secondary"
+          (click)="parseCSVData()"
+          title="Valida y carga el CSV escrito en el textarea"
+        >
           <span class="material-symbols-rounded">rule</span>
           Parse Data
         </button>
@@ -78,15 +106,29 @@
     } @else {
       <div class="manual-data-inputs">
         <div class="input-group">
-          <label>Input Values</label>
-          <input type="number" class="param-input" [ngModel]="shapeInfo().inputSize" disabled />
+          <label title="Cantidad de valores de entrada calculada desde el nodo Input"
+            >Input Values</label
+          >
+          <input
+            type="number"
+            class="param-input"
+            [ngModel]="shapeInfo().inputSize"
+            disabled
+            title="Valor calculado desde la forma de entrada del grafo"
+          />
         </div>
         <div class="input-group">
-          <label>Output Values</label>
-          <input type="number" class="param-input" [ngModel]="shapeInfo().outputSize" disabled />
+          <label title="Cantidad de valores de salida esperados por el modelo">Output Values</label>
+          <input
+            type="number"
+            class="param-input"
+            [ngModel]="shapeInfo().outputSize"
+            disabled
+            title="Valor calculado desde la ultima capa de salida"
+          />
         </div>
         <div class="input-group">
-          <label>Samples</label>
+          <label title="Numero de filas sinteticas que se generaran para entrenar">Samples</label>
           <input
             type="number"
             class="param-input"
@@ -94,9 +136,14 @@
             (ngModelChange)="updateManualData()"
             min="10"
             max="10000"
+            title="Define cuantas muestras de ejemplo generar. Rango: 10 a 10000."
           />
         </div>
-        <button class="btn primary" (click)="generateSampleData()">
+        <button
+          class="btn primary"
+          (click)="generateSampleData()"
+          title="Genera datos sinteticos con las dimensiones actuales del grafo"
+        >
           <span class="material-symbols-rounded">data_object</span>
           Generate
         </button>
@@ -108,15 +155,28 @@
   <div class="panel-section">
     <h3>Model</h3>
     <div class="model-actions">
-      <button class="btn primary" (click)="buildModel()">
+      <button
+        class="btn primary"
+        (click)="buildModel()"
+        title="Valida el grafo y construye un modelo TensorFlow.js"
+      >
         <span class="material-symbols-rounded">memory</span>
         Build Model
       </button>
-      <button class="btn secondary" (click)="downloadModel()" [disabled]="!hasModel()">
+      <button
+        class="btn secondary"
+        (click)="downloadModel()"
+        [disabled]="!hasModel()"
+        title="Descarga el modelo construido en formato JSON"
+      >
         <span class="material-symbols-rounded">download</span>
         Download
       </button>
-      <button class="btn secondary" (click)="downloadModelCode()">
+      <button
+        class="btn secondary"
+        (click)="downloadModelCode()"
+        title="Exporta codigo TypeScript para reconstruir el modelo"
+      >
         <span class="material-symbols-rounded">code</span>
         Export TS
       </button>
@@ -135,7 +195,7 @@
     <h3>Training Config</h3>
     <div class="config-grid">
       <div class="config-field">
-        <label>Epochs</label>
+        <label title="Numero de pasadas completas sobre el dataset">Epochs</label>
         <input
           type="number"
           class="param-input"
@@ -143,10 +203,11 @@
           (ngModelChange)="updateConfig('epochs', $event)"
           min="1"
           max="500"
+          title="Numero de epochs de entrenamiento. Rango: 1 a 500."
         />
       </div>
       <div class="config-field">
-        <label>Batch Size</label>
+        <label title="Cantidad de muestras procesadas por actualizacion de pesos">Batch Size</label>
         <input
           type="number"
           class="param-input"
@@ -154,10 +215,11 @@
           (ngModelChange)="updateConfig('batchSize', $event)"
           min="1"
           max="256"
+          title="Tamano del batch. Valores grandes pueden acelerar pero consumen mas memoria."
         />
       </div>
       <div class="config-field">
-        <label>Learning Rate</label>
+        <label title="Tasa con la que el optimizador actualiza los pesos">Learning Rate</label>
         <input
           type="number"
           class="param-input"
@@ -166,10 +228,11 @@
           min="0.00001"
           max="1"
           step="0.0001"
+          title="Learning rate del optimizador. Valores altos aprenden rapido pero pueden ser inestables."
         />
       </div>
       <div class="config-field">
-        <label>Validation Split</label>
+        <label title="Fraccion del dataset reservada para validacion">Validation Split</label>
         <input
           type="number"
           class="param-input"
@@ -178,14 +241,16 @@
           min="0"
           max="0.5"
           step="0.05"
+          title="Porcentaje de datos usado para validar durante entrenamiento. Rango: 0 a 0.5."
         />
       </div>
       <div class="config-field">
-        <label>Optimizer</label>
+        <label title="Algoritmo usado para ajustar los pesos del modelo">Optimizer</label>
         <select
           class="param-select"
           [ngModel]="config().optimizer"
           (ngModelChange)="updateConfig('optimizer', $event)"
+          title="Selecciona el optimizador de entrenamiento"
         >
           <option value="adam">Adam</option>
           <option value="sgd">SGD</option>
@@ -193,11 +258,12 @@
         </select>
       </div>
       <div class="config-field">
-        <label>Loss</label>
+        <label title="Funcion que mide el error entre prediccion y salida esperada">Loss</label>
         <select
           class="param-select"
           [ngModel]="config().loss"
           (ngModelChange)="updateConfig('loss', $event)"
+          title="Selecciona la funcion de perdida adecuada para tu problema"
         >
           <option value="categoricalCrossentropy">Categorical Crossentropy</option>
           <option value="binaryCrossentropy">Binary Crossentropy</option>
@@ -287,11 +353,17 @@
         class="btn primary large"
         (click)="startTraining()"
         [disabled]="training() || trainingData().x.length === 0"
+        title="Inicia el entrenamiento con los datos y configuracion actuales"
       >
         <span class="material-symbols-rounded">play_arrow</span>
         {{ training() ? 'Training...' : 'Start Training' }}
       </button>
-      <button class="btn danger large" (click)="stopTraining()" [disabled]="!training()">
+      <button
+        class="btn danger large"
+        (click)="stopTraining()"
+        [disabled]="!training()"
+        title="Solicita detener el entrenamiento actual"
+      >
         <span class="material-symbols-rounded">stop</span>
         Stop
       </button>
@@ -299,10 +371,95 @@
   </div>
 </div>
 
+@if (datasetModalOpen()) {
+  <div class="dataset-modal-backdrop" (click)="closeDatasetModal()">
+    <section
+      class="dataset-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="dataset-modal-title"
+      (click)="$event.stopPropagation()"
+    >
+      <header class="dataset-modal-header">
+        <div>
+          <h3 id="dataset-modal-title">Load Dataset</h3>
+          <p>Selecciona un dataset publico y cuantas muestras cargar en memoria.</p>
+        </div>
+        <button
+          class="modal-close"
+          (click)="closeDatasetModal()"
+          [disabled]="datasetLoading()"
+          title="Cierra el selector de datasets"
+          aria-label="Close dataset modal"
+        >
+          <span class="material-symbols-rounded">close</span>
+        </button>
+      </header>
+
+      <div class="dataset-list">
+        @for (dataset of datasetDefinitions; track dataset.id) {
+          <button
+            class="dataset-option"
+            [class.active]="selectedDatasetId() === dataset.id"
+            (click)="selectDataset(dataset)"
+            [title]="dataset.description"
+          >
+            <span class="material-symbols-rounded">dataset</span>
+            <span>
+              <strong>{{ dataset.name }}</strong>
+              <small>{{ dataset.description }}</small>
+              <small
+                >{{ dataset.source }} · {{ dataset.imageShape.join(' × ') }} ·
+                {{ dataset.outputClasses }} classes</small
+              >
+            </span>
+          </button>
+        }
+      </div>
+
+      <div class="dataset-settings">
+        <label title="Cantidad de ejemplos que se leeran desde el dataset remoto">Samples</label>
+        <input
+          type="number"
+          class="param-input"
+          [ngModel]="datasetSamples()"
+          (ngModelChange)="datasetSamples.set($event)"
+          min="1"
+          [max]="selectedDataset().maxSamples"
+          step="100"
+          title="Carga solo una muestra del dataset para mantener la app rapida"
+        />
+        <span>max {{ selectedDataset().maxSamples }}</span>
+      </div>
+
+      @if (datasetError()) {
+        <p class="dataset-error">{{ datasetError() }}</p>
+      }
+
+      <footer class="dataset-modal-actions">
+        <button class="btn secondary" (click)="closeDatasetModal()" [disabled]="datasetLoading()">
+          Cancel
+        </button>
+        <button
+          class="btn primary"
+          (click)="loadSelectedDataset()"
+          [disabled]="datasetLoading()"
+          title="Descarga el dataset seleccionado y prepara el grafo compatible"
+        >
+          <span class="material-symbols-rounded">{{
+            datasetLoading() ? 'hourglass_empty' : 'download'
+          }}</span>
+          {{ datasetLoading() ? 'Loading...' : 'Load selected' }}
+        </button>
+      </footer>
+    </section>
+  </div>
+}
+
 <ng-template #manualInputs>
   <div class="manual-data-inputs">
     <div class="input-group">
-      <label>Input Dim</label>
+      <label title="Cantidad manual de valores de entrada">Input Dim</label>
       <input
         type="number"
         class="param-input"
@@ -310,10 +467,11 @@
         (ngModelChange)="updateManualData()"
         min="1"
         max="100"
+        title="Dimension manual de entrada para generar datos de ejemplo"
       />
     </div>
     <div class="input-group">
-      <label>Output Dim</label>
+      <label title="Cantidad manual de valores objetivo">Output Dim</label>
       <input
         type="number"
         class="param-input"
@@ -321,10 +479,11 @@
         (ngModelChange)="updateManualData()"
         min="1"
         max="100"
+        title="Dimension manual de salida para generar datos de ejemplo"
       />
     </div>
     <div class="input-group">
-      <label>Samples</label>
+      <label title="Numero de filas sinteticas que se generaran">Samples</label>
       <input
         type="number"
         class="param-input"
@@ -332,9 +491,14 @@
         (ngModelChange)="updateManualData()"
         min="10"
         max="10000"
+        title="Cantidad de muestras a generar. Rango: 10 a 10000."
       />
     </div>
-    <button class="btn primary" (click)="generateSampleData()">
+    <button
+      class="btn primary"
+      (click)="generateSampleData()"
+      title="Genera datos sinteticos con las dimensiones manuales"
+    >
       <span class="material-symbols-rounded">data_object</span>
       Generate
     </button>

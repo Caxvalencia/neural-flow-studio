@@ -1,18 +1,27 @@
-<div class="node"
-     [class.selected]="isSelected"
-     [class.dragging]="isDragging()"
-     [class.connection-active]="connectionActive"
-     [style.left.px]="node.x"
-     [style.top.px]="node.y"
-     [style.border-color]="layerDef()?.color"
-     (click)="nodeClick.emit(node)">
-
+<div
+  class="node"
+  [class.selected]="isSelected"
+  [class.dragging]="isDragging()"
+  [class.connection-active]="connectionActive"
+  [style.left.px]="node.x"
+  [style.top.px]="node.y"
+  [style.border-color]="layerDef()?.color"
+  [title]="
+    (layerDef()?.description || node.label) + '. Click para configurar. Arrastra para mover.'
+  "
+  (click)="nodeClick.emit(node)"
+>
   <div class="node-header">
     <div class="node-type-info">
       <span class="node-icon material-symbols-rounded">{{ layerDef()?.icon }}</span>
       <span class="node-label">{{ node.label }}</span>
     </div>
-    <button class="node-delete" (click)="$event.stopPropagation(); removeNode()" title="Delete node">
+    <button
+      class="node-delete"
+      (click)="$event.stopPropagation(); removeNode()"
+      title="Elimina este nodo del grafo"
+      aria-label="Delete node"
+    >
       <span class="material-symbols-rounded">close</span>
     </button>
   </div>
@@ -20,14 +29,17 @@
   <div class="node-ports">
     <div class="input-ports">
       @for (port of node.inputPorts; track trackByPortId($index, port)) {
-        <div class="port input-port"
-             [attr.data-node-id]="node.id"
-             [attr.data-port-id]="port.id"
-             data-port-type="input"
-             [style.top.px]="getInputPortY(port.id)"
-             (pointerdown)="onPortPointerDown($event, port.id, 'input')"
-             (pointerup)="onPortPointerUp($event, port.id, 'input')"
-             (click)="onPortClick($event, port.id, 'input')">
+        <div
+          class="port input-port"
+          [attr.data-node-id]="node.id"
+          [attr.data-port-id]="port.id"
+          data-port-type="input"
+          [style.top.px]="getInputPortY(port.id)"
+          [title]="'Puerto de entrada ' + port.label + '. Suelta aqui una conexion de salida.'"
+          (pointerdown)="onPortPointerDown($event, port.id, 'input')"
+          (pointerup)="onPortPointerUp($event, port.id, 'input')"
+          (click)="onPortClick($event, port.id, 'input')"
+        >
           <span class="port-dot"></span>
           <span class="port-label">{{ port.label }}</span>
         </div>
@@ -54,14 +66,19 @@
 
     <div class="output-ports">
       @for (port of node.outputPorts; track trackByPortId($index, port)) {
-        <div class="port output-port"
-             [attr.data-node-id]="node.id"
-             [attr.data-port-id]="port.id"
-             data-port-type="output"
-             [style.top.px]="getOutputPortY(port.id)"
-             (pointerdown)="onPortPointerDown($event, port.id, 'output')"
-             (pointerup)="onPortPointerUp($event, port.id, 'output')"
-             (click)="onPortClick($event, port.id, 'output')">
+        <div
+          class="port output-port"
+          [attr.data-node-id]="node.id"
+          [attr.data-port-id]="port.id"
+          data-port-type="output"
+          [style.top.px]="getOutputPortY(port.id)"
+          [title]="
+            'Puerto de salida ' + port.label + '. Arrastra o haz click para iniciar una conexion.'
+          "
+          (pointerdown)="onPortPointerDown($event, port.id, 'output')"
+          (pointerup)="onPortPointerUp($event, port.id, 'output')"
+          (click)="onPortClick($event, port.id, 'output')"
+        >
           <span class="port-label">{{ port.label }}</span>
           <span class="port-dot"></span>
         </div>

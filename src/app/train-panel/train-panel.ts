@@ -2,17 +2,22 @@ import { CommonModule } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
+import { DatasetDefinition, DatasetService } from '../services/dataset.service';
+import { GraphService } from '../services/graph.service';
 import { TfjsBackend, TfjsService, TrainingConfig, TrainingData } from '../services/tfjs.service';
+import { TooltipDirective } from '../shared/tooltip.directive';
 
 @Component({
   selector: 'app-train-panel',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, TooltipDirective],
   templateUrl: './train-panel.html',
   styleUrl: './train-panel.scss',
 })
 export class TrainPanelComponent {
   tfjsService = inject(TfjsService);
+  private datasetService = inject(DatasetService);
+  private graphService = inject(GraphService);
 
   config = signal<TrainingConfig>({
     epochs: 50,
@@ -27,6 +32,13 @@ export class TrainPanelComponent {
   trainingData = signal<TrainingData>({ x: [], y: [] });
   dataInput = signal('');
   dataFormat = signal<'csv' | 'manual'>('csv');
+  datasetModalOpen = signal(false);
+  selectedDatasetId = signal(this.datasetService.datasets[0]?.id ?? '');
+  datasetSamples = signal(this.datasetService.datasets[0]?.defaultSamples ?? 1000);
+  datasetLoading = signal(false);
+  datasetError = signal<string | null>(null);
+  loadedDatasetLabel = signal<string | null>(null);
+  datasetDefinitions = this.datasetService.datasets;
   manualInputDim = 4;
   manualOutputDim = 3;
   manualSamples = 200;
@@ -146,6 +158,58 @@ export class TrainPanelComponent {
 
   updateManualData() {
     this.generateSampleData();
+  }
+
+  openDatasetModal() {
+    this.datasetError.set(null);
+    this.datasetModalOpen.set(true);
+  }
+
+  closeDatasetModal() {
+    if (this.datasetLoading()) return;
+    this.datasetModalOpen.set(false);
+  }
+
+  selectDataset(dataset: DatasetDefinition) {
+    this.selectedDatasetId.set(dataset.id);
+    this.datasetSamples.set(Math.min(this.datasetSamples(), dataset.maxSamples));
+    this.datasetError.set(null);
+  }
+
+  selectedDataset(): DatasetDefinition {
+    return (
+      this.datasetDefinitions.find((dataset) => dataset.id === this.selectedDatasetId()) ??
+      this.datasetDefinitions[0]
+    );
+  }
+
+  async loadSelectedDataset() {
+    const dataset = this.selectedDataset();
+    if (!dataset) return;
+
+    this.datasetLoading.set(true);
+    this.datasetError.set(null);
+
+    try {
+      const loaded = await this.datasetService.loadDataset(dataset.id, this.datasetSamples());
+      this.graphService.loadTemplate(loaded.definition.template);
+      this.trainingData.set(loaded.data);
+      this.dataInput.set('');
+      this.dataFormat.set('csv');
+      this.loadedDatasetLabel.set(`${loaded.definition.name} (${loaded.data.x.length} samples)`);
+      const model = this.tfjsService.buildModelFromGraph();
+      this.modelSummary.set(
+        model
+          ? this.tfjsService.getModelSummary()
+          : 'Dataset loaded, but the compatible model could not be built.',
+      );
+      this.datasetModalOpen.set(false);
+    } catch (e) {
+      console.error('Dataset load failed:', e);
+      this.datasetError.set((e as Error).message);
+    } finally {
+      this.datasetLoading.set(false);
+    }
   }
 
   async startTraining() {

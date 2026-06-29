@@ -3,11 +3,14 @@
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background: #1a1a2e;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(68, 91, 150, 0.16), transparent 34%),
+    #202038;
   cursor: grab;
 }
 
-.canvas-container:active {
+.canvas-container:active,
+.canvas-container.panning {
   cursor: grabbing;
 }
 
@@ -15,6 +18,8 @@
   position: absolute;
   top: 0;
   left: 0;
+  width: 10000px;
+  height: 10000px;
   pointer-events: none;
   z-index: 1;
 }
@@ -87,7 +92,7 @@
 .canvas-hint {
   position: absolute;
   left: 236px;
-  bottom: 16px;
+  top: 18px;
   max-width: calc(100% - 280px);
   padding: 8px 12px;
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -96,7 +101,7 @@
   color: #8b90a3;
   font-size: 12px;
   backdrop-filter: blur(12px);
-  z-index: 100;
+  z-index: 90;
 }
 
 .connection-status {

@@ -1,15 +1,17 @@
+import { CommonModule } from '@angular/common';
 import {
   Component,
-  Input,
-  Output,
+  computed,
   EventEmitter,
   HostListener,
+  Input,
+  Output,
   signal,
-  computed,
 } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { GraphNode } from '../models/graph.model';
 import { getLayerTypeDef } from '../models/layer-types';
+import { TooltipDirective } from '../shared/tooltip.directive';
 
 const NODE_PORTS_MIN_HEIGHT = 80;
 const PORT_ROW_HEIGHT = 28;
@@ -18,7 +20,7 @@ const PORT_AREA_PADDING = 24;
 @Component({
   selector: 'app-node',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, TooltipDirective],
   templateUrl: './node.html',
   styleUrl: './node.scss',
 })
@@ -27,7 +29,10 @@ export class NodeComponent {
   @Input({ required: true }) isSelected!: boolean;
   @Input() connectionActive = false;
   @Input({ required: true }) canvasTransform!: { x: number; y: number; scale: number };
-  @Input({ required: true }) getPortPosition!: (nodeId: string, portId: string) => { x: number; y: number };
+  @Input({ required: true }) getPortPosition!: (
+    nodeId: string,
+    portId: string,
+  ) => { x: number; y: number };
 
   @Output() nodeClick = new EventEmitter<GraphNode>();
   @Output() remove = new EventEmitter<string>();
@@ -55,9 +60,11 @@ export class NodeComponent {
 
   @HostListener('pointerdown', ['$event'])
   onPointerDown(event: PointerEvent) {
-    if (event.target === event.currentTarget ||
-        (event.target as HTMLElement).classList.contains('node-header') ||
-        (event.target as HTMLElement).classList.contains('node-body')) {
+    if (
+      event.target === event.currentTarget ||
+      (event.target as HTMLElement).classList.contains('node-header') ||
+      (event.target as HTMLElement).classList.contains('node-body')
+    ) {
       this.startDrag(event);
     }
   }
@@ -118,7 +125,7 @@ export class NodeComponent {
   }
 
   getPortY(portId: string, ports: GraphNode['inputPorts']): number {
-    const index = ports.findIndex(p => p.id === portId);
+    const index = ports.findIndex((p) => p.id === portId);
     const count = ports.length;
     if (index < 0 || count === 0) return NODE_PORTS_MIN_HEIGHT / 2;
 

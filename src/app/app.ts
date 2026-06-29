@@ -1,14 +1,16 @@
-import { Component, HostListener, computed, inject, signal } from '@angular/core';
+import { Component, computed, HostListener, inject, signal } from '@angular/core';
+
 import { CanvasComponent } from './canvas/canvas';
 import { ConfigPanelComponent } from './config-panel/config-panel';
-import { TrainPanelComponent } from './train-panel/train-panel';
 import { GraphService } from './services/graph.service';
+import { TooltipDirective } from './shared/tooltip.directive';
+import { TrainPanelComponent } from './train-panel/train-panel';
 
 @Component({
   selector: 'app-root',
-  imports: [CanvasComponent, ConfigPanelComponent, TrainPanelComponent],
+  imports: [CanvasComponent, ConfigPanelComponent, TrainPanelComponent, TooltipDirective],
   templateUrl: './app.html',
-  styleUrl: './app.scss'
+  styleUrl: './app.scss',
 })
 export class App {
   private graphService = inject(GraphService);
@@ -43,7 +45,11 @@ export class App {
       this.deleteSelectedNode();
     }
 
-    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'd' && this.hasSelectedNode()) {
+    if (
+      (event.metaKey || event.ctrlKey) &&
+      event.key.toLowerCase() === 'd' &&
+      this.hasSelectedNode()
+    ) {
       event.preventDefault();
       this.duplicateSelectedNode();
     }

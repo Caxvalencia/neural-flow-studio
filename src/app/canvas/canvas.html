@@ -1,22 +1,28 @@
-<div class="canvas-container" #canvasContainer
-     (pointerdown)="onCanvasPointerDown($event)"
-     (pointermove)="onCanvasPointerMove($event)"
-     (pointerup)="onCanvasPointerUp($event)"
-     (pointerleave)="onCanvasPointerLeave($event)"
-     (wheel)="onWheel($event)"
-     (click)="onCanvasClick($event)"
-     (dragover)="onCanvasDragOver($event)"
-     (drop)="onCanvasDrop($event)">
-
-  <svg class="grid-overlay" *ngIf="showGrid()"
-       [style.transform]="transformStyle"
-       [style.transform-origin]="'0 0'">
+<div
+  class="canvas-container"
+  #canvasContainer
+  [class.panning]="isPanning()"
+  (pointerdown)="onCanvasPointerDown($event)"
+  (pointermove)="onCanvasPointerMove($event)"
+  (pointerup)="onCanvasPointerUp($event)"
+  (pointerleave)="onCanvasPointerLeave($event)"
+  (wheel)="onWheel($event)"
+  (click)="onCanvasClick($event)"
+  (dragover)="onCanvasDragOver($event)"
+  (drop)="onCanvasDrop($event)"
+>
+  <svg
+    class="grid-overlay"
+    *ngIf="showGrid()"
+    [style.transform]="transformStyle"
+    [style.transform-origin]="'0 0'"
+  >
     <defs>
-      <pattern id="grid-pattern" width="40" height="40" patternUnits="userSpaceOnUse">
-        <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="1"/>
+      <pattern id="grid-pattern" width="32" height="32" patternUnits="userSpaceOnUse">
+        <circle cx="1.5" cy="1.5" r="1.5" fill="rgba(178, 207, 255, 0.22)" />
       </pattern>
     </defs>
-    <rect width="10000" height="10000" fill="url(#grid-pattern)"/>
+    <rect width="10000" height="10000" fill="url(#grid-pattern)" />
   </svg>
 
   <div class="nodes-layer" [style.transform]="transformStyle" [style.transform-origin]="'0 0'">
@@ -37,15 +43,19 @@
     }
   </div>
 
-  <svg class="connection-overlay" #svgOverlay
-       [style.transform]="transformStyle"
-       [style.transform-origin]="'0 0'">
+  <svg
+    class="connection-overlay"
+    #svgOverlay
+    [style.transform]="transformStyle"
+    [style.transform-origin]="'0 0'"
+  >
     @for (edge of edges(); track trackByEdgeId($index, edge)) {
-      <path class="edge-hitbox"
-            [attr.d]="getEdgePath(edge)"
-            (click)="graphService.removeEdge(edge.id); $event.stopPropagation()" />
-      <path class="edge-path"
-            [attr.d]="getEdgePath(edge)" />
+      <path
+        class="edge-hitbox"
+        [attr.d]="getEdgePath(edge)"
+        (click)="graphService.removeEdge(edge.id); $event.stopPropagation()"
+      />
+      <path class="edge-path" [attr.d]="getEdgePath(edge)" />
     }
 
     @if (connectionDrag().active) {
@@ -55,24 +65,45 @@
 </div>
 
 <div class="canvas-controls">
-  <button class="control-btn" (click)="zoomIn()" title="Zoom In">
+  <button
+    class="control-btn"
+    (click)="zoomIn()"
+    title="Acerca el board manteniendo el centro visible"
+    aria-label="Zoom in"
+  >
     <span class="material-symbols-rounded">add</span>
   </button>
-  <button class="control-btn" (click)="zoomOut()" title="Zoom Out">
+
+  <button
+    class="control-btn"
+    (click)="zoomOut()"
+    title="Aleja el board para ver mas nodos"
+    aria-label="Zoom out"
+  >
     <span class="material-symbols-rounded">remove</span>
   </button>
-  <button class="control-btn" (click)="resetView()" title="Reset View">
+
+  <button
+    class="control-btn"
+    (click)="resetView()"
+    title="Restablece posicion y zoom del board"
+    aria-label="Reset view"
+  >
     <span class="material-symbols-rounded">center_focus_strong</span>
   </button>
-  <button class="control-btn" (click)="toggleGrid()" title="Toggle Grid"
-          [class.active]="showGrid()">
+
+  <button
+    class="control-btn"
+    (click)="toggleGrid()"
+    title="Muestra u oculta la grilla de referencia"
+    aria-label="Toggle grid"
+    [class.active]="showGrid()"
+  >
     <span class="material-symbols-rounded">grid_on</span>
   </button>
 </div>
 
-<div class="canvas-hint">
-  Connect: drag output to input, or click output then click input. Wheel pans. Ctrl/Cmd + wheel zooms.
-</div>
+<div class="canvas-hint">Drag empty space to pan. Wheel pans. Ctrl/Cmd + wheel zooms.</div>
 
 @if (connectionDrag().active) {
   <div class="connection-status">
@@ -85,13 +116,16 @@
   <h4>Layers</h4>
   <div class="layer-list">
     @for (layer of layerTypes; track layer.type) {
-      <div class="layer-item"
-           draggable="true"
-           (dragstart)="onLayerDragStart($event, layer.type)"
-           [style.border-left-color]="layer.color"
-           title="{{layer.description}}">
-        <span class="layer-icon material-symbols-rounded">{{layer.icon}}</span>
-        <span class="layer-label">{{layer.label}}</span>
+      <div
+        class="layer-item"
+        draggable="true"
+        (dragstart)="onLayerDragStart($event, layer.type)"
+        [style.border-left-color]="layer.color"
+        [title]="layer.label + ': ' + layer.description + '. Arrastrala al board para agregarla.'"
+        [attr.aria-label]="'Agregar capa ' + layer.label"
+      >
+        <span class="layer-icon material-symbols-rounded">{{ layer.icon }}</span>
+        <span class="layer-label">{{ layer.label }}</span>
       </div>
     }
   </div>

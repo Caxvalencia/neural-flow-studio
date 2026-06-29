@@ -7,7 +7,13 @@
         <span class="node-type">{{ layerTypeLabel() }}</span>
       </div>
     </div>
-    <button class="close-btn" (click)="close.emit()">
+
+    <button
+      class="close-btn"
+      (click)="close.emit()"
+      title="Cierra el panel y deselecciona el nodo"
+      aria-label="Close config panel"
+    >
       <span class="material-symbols-rounded">close</span>
     </button>
   </div>
@@ -17,23 +23,31 @@
   <div class="params-form" *ngIf="paramDefinitions().length; else noParams">
     @for (param of paramDefinitions(); track param.key) {
       <div class="param-field">
-        <label class="param-label">{{ param.label }}</label>
+        <label class="param-label" [title]="getParamTooltip(param)">{{ param.label }}</label>
 
         @switch (param.type) {
           @case ('number') {
-            <input type="number"
-                   class="param-input"
-                   [min]="param.min"
-                   [max]="param.max"
-                   [step]="param.step || 1"
-                   [placeholder]="param.placeholder"
-                   [value]="params()[param.key] ?? param.defaultValue"
-                   (input)="updateNumberParam(param.key, $any($event.target).value)" />
+            <input
+              type="number"
+              class="param-input"
+              [min]="param.min"
+              [max]="param.max"
+              [step]="param.step || 1"
+              [placeholder]="param.placeholder"
+              [value]="params()[param.key] ?? param.defaultValue"
+              [title]="getParamTooltip(param)"
+              [attr.aria-label]="param.label"
+              (input)="updateNumberParam(param.key, $any($event.target).value)"
+            />
           }
           @case ('select') {
-            <select class="param-select"
-                    [value]="params()[param.key] ?? param.defaultValue"
-                    (change)="updateParam(param.key, $any($event.target).value)">
+            <select
+              class="param-select"
+              [value]="params()[param.key] ?? param.defaultValue"
+              [title]="getParamTooltip(param)"
+              [attr.aria-label]="param.label"
+              (change)="updateParam(param.key, $any($event.target).value)"
+            >
               @for (opt of param.options || []; track opt.value) {
                 <option [value]="opt.value">{{ opt.label }}</option>
               }
@@ -41,25 +55,37 @@
           }
           @case ('boolean') {
             <label class="param-checkbox">
-              <input type="checkbox"
-                     [checked]="params()[param.key] ?? param.defaultValue"
-                     (change)="updateParam(param.key, $any($event.target).checked)" />
+              <input
+                type="checkbox"
+                [checked]="params()[param.key] ?? param.defaultValue"
+                [title]="getParamTooltip(param)"
+                [attr.aria-label]="param.label"
+                (change)="updateParam(param.key, $any($event.target).checked)"
+              />
               <span class="checkbox-label">Enabled</span>
             </label>
           }
           @case ('array') {
-            <input type="text"
-                   class="param-input"
-                   [placeholder]="param.placeholder || 'Comma-separated values'"
-                   [value]="formatValue(params()[param.key] ?? param.defaultValue)"
-                   (input)="updateArrayParam(param.key, $any($event.target).value)" />
+            <input
+              type="text"
+              class="param-input"
+              [placeholder]="param.placeholder || 'Comma-separated values'"
+              [value]="formatValue(params()[param.key] ?? param.defaultValue)"
+              [title]="getParamTooltip(param)"
+              [attr.aria-label]="param.label"
+              (input)="updateArrayParam(param.key, $any($event.target).value)"
+            />
           }
           @default {
-            <input type="text"
-                   class="param-input"
-                   [placeholder]="param.placeholder"
-                   [value]="params()[param.key] ?? param.defaultValue"
-                   (input)="updateParam(param.key, $any($event.target).value)" />
+            <input
+              type="text"
+              class="param-input"
+              [placeholder]="param.placeholder"
+              [value]="params()[param.key] ?? param.defaultValue"
+              [title]="getParamTooltip(param)"
+              [attr.aria-label]="param.label"
+              (input)="updateParam(param.key, $any($event.target).value)"
+            />
           }
         }
 
@@ -78,7 +104,11 @@
   </ng-template>
 
   <div class="node-actions">
-    <button class="action-btn danger" (click)="deleteNode()">
+    <button
+      class="action-btn danger"
+      (click)="deleteNode()"
+      title="Elimina el nodo seleccionado y sus conexiones"
+    >
       <span class="material-symbols-rounded">delete</span>
       Delete Node
     </button>

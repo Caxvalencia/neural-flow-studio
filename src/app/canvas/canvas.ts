@@ -1,19 +1,21 @@
+import { CommonModule } from '@angular/common';
 import {
+  AfterViewInit,
   Component,
-  ElementRef,
-  ViewChild,
-  inject,
-  signal,
   computed,
   effect,
+  ElementRef,
   HostListener,
-  AfterViewInit,
+  inject,
+  signal,
+  ViewChild,
 } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { GraphService } from '../services/graph.service';
-import { LAYER_TYPES, getLayerTypeDef } from '../models/layer-types';
-import { NodeComponent } from '../node/node';
+
 import { Edge } from '../models/graph.model';
+import { getLayerTypeDef, LAYER_TYPES } from '../models/layer-types';
+import { NodeComponent } from '../node/node';
+import { GraphService } from '../services/graph.service';
+import { TooltipDirective } from '../shared/tooltip.directive';
 
 const NODE_MIN_WIDTH = 240;
 const NODE_HEADER_HEIGHT = 41;
@@ -24,7 +26,7 @@ const PORT_AREA_PADDING = 24;
 @Component({
   selector: 'app-canvas',
   standalone: true,
-  imports: [CommonModule, NodeComponent],
+  imports: [CommonModule, NodeComponent, TooltipDirective],
   templateUrl: './canvas.html',
   styleUrl: './canvas.scss',
 })
@@ -44,6 +46,7 @@ export class CanvasComponent implements AfterViewInit {
   isPanning = signal(false);
   lastPanPoint = signal({ x: 0, y: 0 });
   showGrid = signal(true);
+  private panMoved = false;
   private ignoreNextConnectionPointerUp = false;
 
   ngAfterViewInit() {
@@ -67,7 +70,10 @@ export class CanvasComponent implements AfterViewInit {
   }
 
   onCanvasPointerDown(event: PointerEvent) {
-    if (event.button === 1 || (event.button === 0 && event.altKey)) {
+    if (
+      event.button === 1 ||
+      (event.button === 0 && (event.altKey || this.isEmptyCanvasTarget(event.target)))
+    ) {
       this.startPan(event);
     }
   }
@@ -121,7 +127,9 @@ export class CanvasComponent implements AfterViewInit {
   }
 
   private startPan(event: PointerEvent) {
+    event.preventDefault();
     this.isPanning.set(true);
+    this.panMoved = false;
     this.lastPanPoint.set({ x: event.clientX, y: event.clientY });
     this.canvasContainer?.nativeElement?.setPointerCapture(event.pointerId);
   }
@@ -130,6 +138,9 @@ export class CanvasComponent implements AfterViewInit {
     const last = this.lastPanPoint();
     const dx = event.clientX - last.x;
     const dy = event.clientY - last.y;
+    if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
+      this.panMoved = true;
+    }
     this.graphService.panCanvas(dx, dy);
     this.lastPanPoint.set({ x: event.clientX, y: event.clientY });
   }
@@ -158,14 +169,35 @@ export class CanvasComponent implements AfterViewInit {
   }
 
   onCanvasClick(event: MouseEvent) {
-    if (event.target === this.canvasContainer?.nativeElement ||
-        event.target === this.svgOverlay?.nativeElement) {
+    if (this.panMoved) {
+      this.panMoved = false;
+      return;
+    }
+
+    if (
+      event.target === this.canvasContainer?.nativeElement ||
+      event.target === this.svgOverlay?.nativeElement ||
+      this.isEmptyCanvasTarget(event.target)
+    ) {
       if (this.connectionDrag().active) {
         this.graphService.cancelConnectionDrag();
         this.ignoreNextConnectionPointerUp = false;
       }
       this.graphService.selectNode(null);
     }
+  }
+
+  private isEmptyCanvasTarget(target: EventTarget | null): boolean {
+    const element = target as HTMLElement | SVGElement | null;
+    if (!element) return false;
+
+    return (
+      element === this.canvasContainer?.nativeElement ||
+      element === this.svgOverlay?.nativeElement ||
+      element.classList.contains('grid-overlay') ||
+      element.classList.contains('nodes-layer') ||
+      element.classList.contains('connection-overlay')
+    );
   }
 
   onLayerDragStart(event: DragEvent, layerType: string) {
@@ -242,7 +274,10 @@ export class CanvasComponent implements AfterViewInit {
     return completed;
   }
 
-  private findNearestInputPort(clientX: number, clientY: number): { nodeId: string; portId: string } | null {
+  private findNearestInputPort(
+    clientX: number,
+    clientY: number,
+  ): { nodeId: string; portId: string } | null {
     const graphPoint = this.clientPointToGraph(clientX, clientY);
     const radius = 42 / this.canvasTransform().scale;
     let nearest: { nodeId: string; portId: string; distance: number } | null = null;
@@ -261,7 +296,7 @@ export class CanvasComponent implements AfterViewInit {
   }
 
   onNodeDrag(event: { nodeId: string; dx: number; dy: number }) {
-    const node = this.nodes().find(n => n.id === event.nodeId);
+    const node = this.nodes().find((n) => n.id === event.nodeId);
     if (!node) return;
     this.graphService.updateNodePosition(event.nodeId, node.x + event.dx, node.y + event.dy);
   }
@@ -324,17 +359,17 @@ export class CanvasComponent implements AfterViewInit {
   }
 
   toggleGrid() {
-    this.showGrid.update(v => !v);
+    this.showGrid.update((v) => !v);
   }
 
   getPortPosition(nodeId: string, portId: string): { x: number; y: number } {
     const measuredPosition = this.getMeasuredPortPosition(nodeId, portId);
     if (measuredPosition) return measuredPosition;
 
-    const node = this.nodes().find(n => n.id === nodeId);
+    const node = this.nodes().find((n) => n.id === nodeId);
     if (!node) return { x: 0, y: 0 };
 
-    const port = [...node.inputPorts, ...node.outputPorts].find(p => p.id === portId);
+    const port = [...node.inputPorts, ...node.outputPorts].find((p) => p.id === portId);
     if (!port) {
       return {
         x: node.x + NODE_MIN_WIDTH / 2,
@@ -342,9 +377,10 @@ export class CanvasComponent implements AfterViewInit {
       };
     }
 
-    const portIndex = port.type === 'input'
-      ? node.inputPorts.findIndex(p => p.id === portId)
-      : node.outputPorts.findIndex(p => p.id === portId);
+    const portIndex =
+      port.type === 'input'
+        ? node.inputPorts.findIndex((p) => p.id === portId)
+        : node.outputPorts.findIndex((p) => p.id === portId);
 
     const portCount = port.type === 'input' ? node.inputPorts.length : node.outputPorts.length;
     const maxPortCount = Math.max(node.inputPorts.length, node.outputPorts.length);
@@ -366,7 +402,7 @@ export class CanvasComponent implements AfterViewInit {
     const portElement = Array.from(
       container.querySelectorAll<HTMLElement>('[data-node-id][data-port-id]'),
     ).find(
-      element => element.dataset['nodeId'] === nodeId && element.dataset['portId'] === portId,
+      (element) => element.dataset['nodeId'] === nodeId && element.dataset['portId'] === portId,
     );
 
     const dotElement = portElement?.querySelector<HTMLElement>('.port-dot');
@@ -389,7 +425,10 @@ export class CanvasComponent implements AfterViewInit {
     return this.generateConnectionPath(source, target);
   }
 
-  private generateConnectionPath(source: { x: number; y: number }, target: { x: number; y: number }): string {
+  private generateConnectionPath(
+    source: { x: number; y: number },
+    target: { x: number; y: number },
+  ): string {
     const dx = target.x - source.x;
     const curveStrength = Math.max(60, Math.min(Math.abs(dx) * 0.5, 180));
     const direction = dx >= 0 ? 1 : -1;
