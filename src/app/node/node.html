@@ -1,0 +1,75 @@
+<div class="node"
+     [class.selected]="isSelected"
+     [class.dragging]="isDragging()"
+     [class.connection-active]="connectionActive"
+     [style.left.px]="node.x"
+     [style.top.px]="node.y"
+     [style.border-color]="layerDef()?.color"
+     (click)="nodeClick.emit(node)">
+
+  <div class="node-header">
+    <div class="node-type-info">
+      <span class="node-icon material-symbols-rounded">{{ layerDef()?.icon }}</span>
+      <span class="node-label">{{ node.label }}</span>
+    </div>
+    <button class="node-delete" (click)="$event.stopPropagation(); removeNode()" title="Delete node">
+      <span class="material-symbols-rounded">close</span>
+    </button>
+  </div>
+
+  <div class="node-ports">
+    <div class="input-ports">
+      @for (port of node.inputPorts; track trackByPortId($index, port)) {
+        <div class="port input-port"
+             [attr.data-node-id]="node.id"
+             [attr.data-port-id]="port.id"
+             data-port-type="input"
+             [style.top.px]="getInputPortY(port.id)"
+             (pointerdown)="onPortPointerDown($event, port.id, 'input')"
+             (pointerup)="onPortPointerUp($event, port.id, 'input')"
+             (click)="onPortClick($event, port.id, 'input')">
+          <span class="port-dot"></span>
+          <span class="port-label">{{ port.label }}</span>
+        </div>
+      }
+    </div>
+
+    <div class="node-body">
+      @if (paramDefinitions().length) {
+        <div class="params-preview">
+          @for (param of paramDefinitions().slice(0, 3); track param.key) {
+            <div class="param-row">
+              <span class="param-key">{{ param.label }}:</span>
+              <span class="param-value">{{ formatParamValue(param.key) }}</span>
+            </div>
+          }
+          @if (paramDefinitions().length > 3) {
+            <div class="param-more">+{{ paramDefinitions().length - 3 }} more</div>
+          }
+        </div>
+      } @else {
+        <div class="no-params">No parameters</div>
+      }
+    </div>
+
+    <div class="output-ports">
+      @for (port of node.outputPorts; track trackByPortId($index, port)) {
+        <div class="port output-port"
+             [attr.data-node-id]="node.id"
+             [attr.data-port-id]="port.id"
+             data-port-type="output"
+             [style.top.px]="getOutputPortY(port.id)"
+             (pointerdown)="onPortPointerDown($event, port.id, 'output')"
+             (pointerup)="onPortPointerUp($event, port.id, 'output')"
+             (click)="onPortClick($event, port.id, 'output')">
+          <span class="port-label">{{ port.label }}</span>
+          <span class="port-dot"></span>
+        </div>
+      }
+    </div>
+  </div>
+
+  <div class="node-type-badge" [style.background]="layerDef()?.color">
+    {{ layerTypeLabel() }}
+  </div>
+</div>

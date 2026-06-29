@@ -1,0 +1,139 @@
+<main class="app-shell">
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark"><span class="material-symbols-rounded">hub</span></div>
+      <div>
+        <h1>{{ title() }}</h1>
+        <p>Constructor visual de redes neuronales con TensorFlow.js + WebGPU</p>
+      </div>
+    </div>
+
+    <div class="graph-stats">
+      <span>{{ nodeCount() }} nodes</span>
+      <span>{{ edgeCount() }} edges</span>
+      <span>{{ savedAt() ? 'saved ' + savedAt() : 'not saved' }}</span>
+    </div>
+
+    <div class="topbar-actions">
+      <button class="ghost-btn" (click)="loadTemplate('dense-classifier')">
+        <span class="material-symbols-rounded">schema</span>
+        Dense template
+      </button>
+      <button class="ghost-btn" (click)="loadTemplate('cnn-classifier')">
+        <span class="material-symbols-rounded">grid_view</span>
+        CNN template
+      </button>
+      <span class="toolbar-divider"></span>
+      <button class="ghost-btn" (click)="duplicateSelectedNode()" [disabled]="!hasSelectedNode()" title="Cmd/Ctrl + D">
+        <span class="material-symbols-rounded">content_copy</span>
+        Duplicate
+      </button>
+      <button class="ghost-btn danger" (click)="deleteSelectedNode()" [disabled]="!hasSelectedNode()" title="Delete / Backspace">
+        <span class="material-symbols-rounded">delete</span>
+        Delete node
+      </button>
+      <span class="toolbar-divider"></span>
+      <button class="ghost-btn" (click)="importGraph()">
+        <span class="material-symbols-rounded">upload_file</span>
+        Import graph
+      </button>
+      <button class="ghost-btn" (click)="exportGraph()">
+        <span class="material-symbols-rounded">download</span>
+        Export graph
+      </button>
+      <button class="ghost-btn" (click)="restoreAutosave()">
+        <span class="material-symbols-rounded">history</span>
+        Restore
+      </button>
+      <button class="ghost-btn" (click)="clearAutosave()">
+        <span class="material-symbols-rounded">ink_eraser</span>
+        Clear autosave
+      </button>
+      <button class="ghost-btn" (click)="openShortcuts()" title="?">
+        <span class="material-symbols-rounded">keyboard</span>
+        Shortcuts
+      </button>
+      <button class="ghost-btn danger" (click)="clearGraph()">
+        <span class="material-symbols-rounded">delete_sweep</span>
+        Clear
+      </button>
+    </div>
+  </header>
+
+  <section class="workspace">
+    <div class="canvas-area">
+      <app-canvas />
+    </div>
+
+    <aside class="side-panel">
+      <div class="panel-tabs">
+        <button [class.active]="activePanel() === 'config'" (click)="setPanel('config')">
+          Configure
+        </button>
+        <button [class.active]="activePanel() === 'train'" (click)="setPanel('train')">
+          Train
+        </button>
+      </div>
+
+      <div class="panel-body">
+        @if (activePanel() === 'config') {
+          <app-config-panel [node]="selectedNode()" (close)="closeConfig()" />
+        } @else {
+          <app-train-panel />
+        }
+      </div>
+    </aside>
+  </section>
+
+  @if (shortcutsOpen()) {
+    <div class="modal-backdrop" (click)="closeShortcuts()">
+      <section class="shortcuts-modal" role="dialog" aria-modal="true" aria-labelledby="shortcuts-title" (click)="$event.stopPropagation()">
+        <header class="modal-header">
+          <div class="modal-title-group">
+            <span class="material-symbols-rounded modal-icon">keyboard</span>
+            <div>
+              <h2 id="shortcuts-title">Shortcuts</h2>
+              <p>Acciones rápidas para moverte por el board y editar redes neuronales.</p>
+            </div>
+          </div>
+          <button class="modal-close" (click)="closeShortcuts()" aria-label="Close shortcuts">
+            <span class="material-symbols-rounded">close</span>
+          </button>
+        </header>
+
+        <div class="shortcuts-grid">
+          <article class="shortcut-section">
+            <h3><span class="material-symbols-rounded">open_with</span> Board</h3>
+            <div class="shortcut-row"><kbd>Wheel</kbd><span>Mueve el board vertical/horizontalmente.</span></div>
+            <div class="shortcut-row"><kbd>Shift</kbd><kbd>Wheel</kbd><span>Mueve el board horizontalmente.</span></div>
+            <div class="shortcut-row"><kbd>Ctrl</kbd><kbd>Wheel</kbd><span>Zoom in/out centrado en el cursor.</span></div>
+            <div class="shortcut-row"><kbd>Cmd</kbd><kbd>Wheel</kbd><span>Zoom in/out en macOS.</span></div>
+            <div class="shortcut-row"><kbd>Alt</kbd><kbd>Drag</kbd><span>Arrastra el board manualmente.</span></div>
+          </article>
+
+          <article class="shortcut-section">
+            <h3><span class="material-symbols-rounded">account_tree</span> Nodos</h3>
+            <div class="shortcut-row"><kbd>Drag layer</kbd><span>Arrastra una capa desde el palette al board.</span></div>
+            <div class="shortcut-row"><kbd>Output</kbd><kbd>Drag</kbd><span>Conecta desde la salida de un nodo a la entrada de otro.</span></div>
+            <div class="shortcut-row"><kbd>Click node</kbd><span>Selecciona un nodo para configurar hiperparámetros.</span></div>
+            <div class="shortcut-row"><kbd>Click edge</kbd><span>Elimina una conexión.</span></div>
+          </article>
+
+          <article class="shortcut-section">
+            <h3><span class="material-symbols-rounded">edit</span> Edición</h3>
+            <div class="shortcut-row"><kbd>Cmd</kbd><kbd>D</kbd><span>Duplica el nodo seleccionado.</span></div>
+            <div class="shortcut-row"><kbd>Ctrl</kbd><kbd>D</kbd><span>Duplica el nodo seleccionado en Windows/Linux.</span></div>
+            <div class="shortcut-row"><kbd>Delete</kbd><span>Borra el nodo seleccionado.</span></div>
+            <div class="shortcut-row"><kbd>Backspace</kbd><span>Borra el nodo seleccionado.</span></div>
+          </article>
+
+          <article class="shortcut-section">
+            <h3><span class="material-symbols-rounded">help</span> Ayuda</h3>
+            <div class="shortcut-row"><kbd>?</kbd><span>Abre esta modal.</span></div>
+            <div class="shortcut-row"><kbd>Esc</kbd><span>Cierra esta modal.</span></div>
+          </article>
+        </div>
+      </section>
+    </div>
+  }
+</main>

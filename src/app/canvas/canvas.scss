@@ -1,0 +1,259 @@
+.canvas-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #1a1a2e;
+  cursor: grab;
+}
+
+.canvas-container:active {
+  cursor: grabbing;
+}
+
+.grid-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.connection-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 10000px;
+  height: 10000px;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.edge-hitbox {
+  stroke: transparent;
+  stroke-width: 16;
+  fill: none;
+  cursor: pointer;
+  pointer-events: stroke;
+}
+
+.edge-path {
+  stroke: rgba(115, 195, 255, 0.78);
+  stroke-width: 2.5;
+  fill: none;
+  stroke-linecap: round;
+  stroke-dasharray: 8 4;
+  filter: drop-shadow(0 0 8px rgba(33, 150, 243, 0.55));
+  pointer-events: none;
+  animation: dash-flow 12s linear infinite;
+}
+
+.edge-preview-path {
+  stroke: rgba(121, 255, 141, 0.9);
+  stroke-width: 2.5;
+  fill: none;
+  stroke-linecap: round;
+  stroke-dasharray: 7 5;
+  filter: drop-shadow(0 0 10px rgba(76, 175, 80, 0.7));
+  pointer-events: none;
+  animation: dash-flow 1s linear infinite;
+}
+
+@keyframes dash-flow {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+
+.nodes-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 10000px;
+  height: 10000px;
+  z-index: 3;
+}
+
+.canvas-controls {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 100;
+}
+
+.canvas-hint {
+  position: absolute;
+  left: 236px;
+  bottom: 16px;
+  max-width: calc(100% - 280px);
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.28);
+  color: #8b90a3;
+  font-size: 12px;
+  backdrop-filter: blur(12px);
+  z-index: 100;
+}
+
+.connection-status {
+  position: absolute;
+  left: 50%;
+  top: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border: 1px solid rgba(76, 175, 80, 0.45);
+  border-radius: 999px;
+  background: rgba(10, 43, 22, 0.86);
+  color: #c9ffd0;
+  font-size: 12px;
+  transform: translateX(-50%);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 12px 30px rgba(76, 175, 80, 0.18);
+  z-index: 120;
+}
+
+.connection-status .material-symbols-rounded {
+  color: #79ff8d;
+  font-size: 18px;
+}
+
+.control-btn {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #e0e0e0;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.control-btn .material-symbols-rounded {
+  font-size: 20px;
+}
+
+.control-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: scale(1.05);
+}
+
+.control-btn.active {
+  background: rgba(33, 150, 243, 0.3);
+  border-color: #2196f3;
+}
+
+.layer-palette {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  width: 200px;
+  max-height: calc(100% - 32px);
+  background: rgba(26, 26, 46, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  backdrop-filter: blur(20px);
+  padding: 16px;
+  overflow-y: auto;
+  z-index: 100;
+}
+
+.layer-palette h4 {
+  margin: 0 0 12px;
+  color: #888;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.layer-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.layer-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  border-left: 3px solid transparent;
+  cursor: grab;
+  transition: all 0.15s ease;
+  color: #e0e0e0;
+  font-size: 13px;
+}
+
+.layer-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateX(2px);
+}
+
+.layer-item:active {
+  cursor: grabbing;
+}
+
+.layer-icon {
+  width: 24px;
+  color: #8cc9ff;
+  font-size: 21px;
+  font-variation-settings: 'FILL' 1, 'wght' 600, 'GRAD' 0, 'opsz' 24;
+}
+
+.layer-label {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 1024px) {
+  .layer-palette {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    top: auto;
+    width: 100%;
+    max-height: 40%;
+    border-radius: 16px 16px 0 0;
+    border-bottom: none;
+  }
+
+  .layer-list {
+    flex-direction: row;
+    flex-wrap: wrap;
+    padding-bottom: 16px;
+  }
+
+  .layer-item {
+    flex: 1;
+    min-width: 100px;
+    justify-content: center;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .canvas-hint {
+    display: none;
+  }
+
+  .connection-status {
+    left: 12px;
+    right: 12px;
+    transform: none;
+    justify-content: center;
+  }
+}

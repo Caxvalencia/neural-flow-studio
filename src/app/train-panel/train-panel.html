@@ -1,0 +1,211 @@
+<div class="train-panel">
+  <div class="panel-section">
+    <div class="section-header">
+      <h3>Backend</h3>
+      <span class="backend-badge" [class.webgpu]="webgpuReady()">
+        {{ backend() }}
+      </span>
+    </div>
+    <p class="section-desc">{{ webgpuReady() ? 'WebGPU acceleration enabled' : 'Using WebGL fallback' }}</p>
+  </div>
+
+  <div class="panel-section">
+    <h3>Training Data</h3>
+    <div class="data-format-tabs">
+      <button class="tab-btn" [class.active]="dataFormat() === 'csv'" (click)="dataFormat.set('csv')">CSV</button>
+      <button class="tab-btn" [class.active]="dataFormat() === 'manual'" (click)="dataFormat.set('manual')">Manual</button>
+    </div>
+
+    @if (dataFormat() === 'csv') {
+      <textarea class="data-input"
+                [value]="dataInput()"
+                (input)="dataInput.set($any($event.target).value)"
+                placeholder="CSV: input values followed by output values&#10;Use Generate Sample Data to match the current graph shape"
+                (blur)="parseCSVData()"></textarea>
+      <div class="data-actions">
+        <button class="btn secondary" (click)="generateSampleData()">
+          <span class="material-symbols-rounded">data_object</span>
+          Generate Sample Data
+        </button>
+        <button class="btn secondary" (click)="parseCSVData()">
+          <span class="material-symbols-rounded">rule</span>
+          Parse Data
+        </button>
+      </div>
+      <p class="data-info">
+        Expected: {{ shapeInfo().inputShape.join(' × ') }} input shape ({{ shapeInfo().inputSize }} values),
+        {{ shapeInfo().outputSize }} outputs. Loaded: {{ trainingData().x.length }} samples.
+      </p>
+    } @else {
+      <div class="manual-data-inputs">
+        <div class="input-group">
+          <label>Input Values</label>
+          <input type="number" class="param-input" [ngModel]="shapeInfo().inputSize" disabled />
+        </div>
+        <div class="input-group">
+          <label>Output Values</label>
+          <input type="number" class="param-input" [ngModel]="shapeInfo().outputSize" disabled />
+        </div>
+        <div class="input-group">
+          <label>Samples</label>
+          <input type="number" class="param-input" [(ngModel)]="manualSamples" (ngModelChange)="updateManualData()" min="10" max="10000" />
+        </div>
+        <button class="btn primary" (click)="generateSampleData()">
+          <span class="material-symbols-rounded">data_object</span>
+          Generate
+        </button>
+        <p class="data-info">{{ trainingData().x.length }} samples</p>
+      </div>
+    }
+  </div>
+
+  <div class="panel-section">
+    <h3>Model</h3>
+    <div class="model-actions">
+      <button class="btn primary" (click)="buildModel()">
+        <span class="material-symbols-rounded">memory</span>
+        Build Model
+      </button>
+      <button class="btn secondary" (click)="downloadModel()" [disabled]="!hasModel()">
+        <span class="material-symbols-rounded">download</span>
+        Download
+      </button>
+      <button class="btn secondary" (click)="downloadModelCode()">
+        <span class="material-symbols-rounded">code</span>
+        Export TS
+      </button>
+    </div>
+    @if (modelErrors().length) {
+      <div class="model-errors">
+        @for (error of modelErrors(); track error) {
+          <div class="model-error">{{ error }}</div>
+        }
+      </div>
+    }
+    <div class="model-summary">{{ modelSummary() }}</div>
+  </div>
+
+  <div class="panel-section">
+    <h3>Training Config</h3>
+    <div class="config-grid">
+      <div class="config-field">
+        <label>Epochs</label>
+        <input type="number" class="param-input" [ngModel]="config().epochs" (ngModelChange)="updateConfig('epochs', $event)" min="1" max="500" />
+      </div>
+      <div class="config-field">
+        <label>Batch Size</label>
+        <input type="number" class="param-input" [ngModel]="config().batchSize" (ngModelChange)="updateConfig('batchSize', $event)" min="1" max="256" />
+      </div>
+      <div class="config-field">
+        <label>Learning Rate</label>
+        <input type="number" class="param-input" [ngModel]="config().learningRate" (ngModelChange)="updateConfig('learningRate', $event)" min="0.00001" max="1" step="0.0001" />
+      </div>
+      <div class="config-field">
+        <label>Validation Split</label>
+        <input type="number" class="param-input" [ngModel]="config().validationSplit" (ngModelChange)="updateConfig('validationSplit', $event)" min="0" max="0.5" step="0.05" />
+      </div>
+      <div class="config-field">
+        <label>Optimizer</label>
+        <select class="param-select" [ngModel]="config().optimizer" (ngModelChange)="updateConfig('optimizer', $event)">
+          <option value="adam">Adam</option>
+          <option value="sgd">SGD</option>
+          <option value="rmsprop">RMSprop</option>
+        </select>
+      </div>
+      <div class="config-field">
+        <label>Loss</label>
+        <select class="param-select" [ngModel]="config().loss" (ngModelChange)="updateConfig('loss', $event)">
+          <option value="categoricalCrossentropy">Categorical Crossentropy</option>
+          <option value="binaryCrossentropy">Binary Crossentropy</option>
+          <option value="meanSquaredError">Mean Squared Error</option>
+          <option value="sparseCategoricalCrossentropy">Sparse Categorical Crossentropy</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel-section">
+    <h3>Training</h3>
+    <div class="progress-bar" *ngIf="training()">
+      <div class="progress-fill" [style.width.%]="getProgress()"></div>
+    </div>
+    <div class="epoch-info" *ngIf="training()">
+      <span>Epoch {{ currentEpoch() }} / {{ epochs() }}</span>
+      <span>{{ getProgress() | number:'1.0-0' }}%</span>
+    </div>
+
+    <div class="metrics-grid" *ngIf="trainingMetrics().length || training()">
+      <div class="metric-card">
+        <span class="metric-label">Loss</span>
+        <span class="metric-value">{{ formatNumber(lastLoss()) }}</span>
+      </div>
+      <div class="metric-card">
+        <span class="metric-label">Val Loss</span>
+        <span class="metric-value">{{ formatNumber(lastValLoss()) }}</span>
+      </div>
+      <div class="metric-card">
+        <span class="metric-label">Accuracy</span>
+        <span class="metric-value">{{ lastAccuracy() !== null ? (lastAccuracy()! * 100).toFixed(2) + '%' : '—' }}</span>
+      </div>
+      <div class="metric-card">
+        <span class="metric-label">Val Acc</span>
+        <span class="metric-value">{{ lastValAccuracy() !== null ? (lastValAccuracy()! * 100).toFixed(2) + '%' : '—' }}</span>
+      </div>
+    </div>
+
+    <div class="training-chart" *ngIf="trainingMetrics().length > 1">
+      <svg viewBox="0 0 300 150" preserveAspectRatio="none">
+        <polyline class="chart-line loss-line"
+                  [attr.points]="getChartPoints('loss')"
+                  fill="none" stroke="#f44336" stroke-width="1.5" />
+        <polyline class="chart-line val-loss-line"
+                  [attr.points]="getChartPoints('valLoss')"
+                  fill="none" stroke="#ff9800" stroke-width="1.5" stroke-dasharray="4,2" />
+        <polyline class="chart-line acc-line"
+                  [attr.points]="getChartPoints('accuracy')"
+                  fill="none" stroke="#4caf50" stroke-width="1.5" />
+        <polyline class="chart-line val-acc-line"
+                  [attr.points]="getChartPoints('valAccuracy')"
+                  fill="none" stroke="#8bc34a" stroke-width="1.5" stroke-dasharray="4,2" />
+      </svg>
+      <div class="chart-legend">
+        <span class="legend-item"><span class="legend-color loss"></span>Loss</span>
+        <span class="legend-item"><span class="legend-color val-loss"></span>Val Loss</span>
+        <span class="legend-item"><span class="legend-color acc"></span>Accuracy</span>
+        <span class="legend-item"><span class="legend-color val-acc"></span>Val Acc</span>
+      </div>
+    </div>
+
+    <div class="training-actions">
+      <button class="btn primary large" (click)="startTraining()" [disabled]="training() || trainingData().x.length === 0">
+        <span class="material-symbols-rounded">play_arrow</span>
+        {{ training() ? 'Training...' : 'Start Training' }}
+      </button>
+      <button class="btn danger large" (click)="stopTraining()" [disabled]="!training()">
+        <span class="material-symbols-rounded">stop</span>
+        Stop
+      </button>
+    </div>
+  </div>
+</div>
+
+<ng-template #manualInputs>
+  <div class="manual-data-inputs">
+    <div class="input-group">
+      <label>Input Dim</label>
+      <input type="number" class="param-input" [(ngModel)]="manualInputDim" (ngModelChange)="updateManualData()" min="1" max="100" />
+    </div>
+    <div class="input-group">
+      <label>Output Dim</label>
+      <input type="number" class="param-input" [(ngModel)]="manualOutputDim" (ngModelChange)="updateManualData()" min="1" max="100" />
+    </div>
+    <div class="input-group">
+      <label>Samples</label>
+      <input type="number" class="param-input" [(ngModel)]="manualSamples" (ngModelChange)="updateManualData()" min="10" max="10000" />
+    </div>
+    <button class="btn primary" (click)="generateSampleData()">
+      <span class="material-symbols-rounded">data_object</span>
+      Generate
+    </button>
+  </div>
+</ng-template>

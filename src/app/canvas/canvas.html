@@ -1,0 +1,98 @@
+<div class="canvas-container" #canvasContainer
+     (pointerdown)="onCanvasPointerDown($event)"
+     (pointermove)="onCanvasPointerMove($event)"
+     (pointerup)="onCanvasPointerUp($event)"
+     (pointerleave)="onCanvasPointerLeave($event)"
+     (wheel)="onWheel($event)"
+     (click)="onCanvasClick($event)"
+     (dragover)="onCanvasDragOver($event)"
+     (drop)="onCanvasDrop($event)">
+
+  <svg class="grid-overlay" *ngIf="showGrid()"
+       [style.transform]="transformStyle"
+       [style.transform-origin]="'0 0'">
+    <defs>
+      <pattern id="grid-pattern" width="40" height="40" patternUnits="userSpaceOnUse">
+        <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="1"/>
+      </pattern>
+    </defs>
+    <rect width="10000" height="10000" fill="url(#grid-pattern)"/>
+  </svg>
+
+  <div class="nodes-layer" [style.transform]="transformStyle" [style.transform-origin]="'0 0'">
+    @for (node of nodes(); track trackByNodeId($index, node)) {
+      <app-node
+        [node]="node"
+        [isSelected]="selectedNodeId() === node.id"
+        [connectionActive]="connectionDrag().active"
+        [canvasTransform]="canvasTransform()"
+        [getPortPosition]="getPortPosition.bind(this)"
+        (nodeClick)="graphService.selectNode(node.id)"
+        (nodeDrag)="onNodeDrag($event)"
+        (portDragStart)="onPortDragStart($event)"
+        (portDrop)="onConnectionComplete($event.targetNodeId, $event.targetPortId)"
+        (portClick)="onPortClick($event)"
+        (remove)="graphService.removeNode($event)"
+      />
+    }
+  </div>
+
+  <svg class="connection-overlay" #svgOverlay
+       [style.transform]="transformStyle"
+       [style.transform-origin]="'0 0'">
+    @for (edge of edges(); track trackByEdgeId($index, edge)) {
+      <path class="edge-hitbox"
+            [attr.d]="getEdgePath(edge)"
+            (click)="graphService.removeEdge(edge.id); $event.stopPropagation()" />
+      <path class="edge-path"
+            [attr.d]="getEdgePath(edge)" />
+    }
+
+    @if (connectionDrag().active) {
+      <path class="edge-preview-path" [attr.d]="getPreviewPath()" />
+    }
+  </svg>
+</div>
+
+<div class="canvas-controls">
+  <button class="control-btn" (click)="zoomIn()" title="Zoom In">
+    <span class="material-symbols-rounded">add</span>
+  </button>
+  <button class="control-btn" (click)="zoomOut()" title="Zoom Out">
+    <span class="material-symbols-rounded">remove</span>
+  </button>
+  <button class="control-btn" (click)="resetView()" title="Reset View">
+    <span class="material-symbols-rounded">center_focus_strong</span>
+  </button>
+  <button class="control-btn" (click)="toggleGrid()" title="Toggle Grid"
+          [class.active]="showGrid()">
+    <span class="material-symbols-rounded">grid_on</span>
+  </button>
+</div>
+
+<div class="canvas-hint">
+  Connect: drag output to input, or click output then click input. Wheel pans. Ctrl/Cmd + wheel zooms.
+</div>
+
+@if (connectionDrag().active) {
+  <div class="connection-status">
+    <span class="material-symbols-rounded">cable</span>
+    Click an input port to connect, or click empty board to cancel.
+  </div>
+}
+
+<div class="layer-palette">
+  <h4>Layers</h4>
+  <div class="layer-list">
+    @for (layer of layerTypes; track layer.type) {
+      <div class="layer-item"
+           draggable="true"
+           (dragstart)="onLayerDragStart($event, layer.type)"
+           [style.border-left-color]="layer.color"
+           title="{{layer.description}}">
+        <span class="layer-icon material-symbols-rounded">{{layer.icon}}</span>
+        <span class="layer-label">{{layer.label}}</span>
+      </div>
+    }
+  </div>
+</div>

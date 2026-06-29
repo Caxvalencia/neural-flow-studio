@@ -1,0 +1,14 @@
+<svg:path class="edge-hitbox"
+          [attr.d]="pathData()"
+          (click)="onRemove($event)"
+/>
+
+<svg:path class="edge-path"
+          [attr.d]="pathData()"
+          stroke="rgba(255, 255, 255, 0.4)"
+          stroke-width="2"
+          fill="none"
+          stroke-linecap="round"
+          stroke-dasharray="8,4"
+          style="animation: dash 10s linear infinite;"
+/>

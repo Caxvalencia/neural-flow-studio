@@ -1,0 +1,15 @@
+.preview-path {
+  stroke: rgba(33, 150, 243, 0.6);
+  stroke-width: 2;
+  fill: none;
+  stroke-linecap: round;
+  stroke-dasharray: 6, 4;
+  animation: dash 1s linear infinite;
+  filter: drop-shadow(0 0 4px rgba(33, 150, 243, 0.5));
+}
+
+@keyframes dash {
+  to {
+    stroke-dashoffset: -10;
+  }
+}

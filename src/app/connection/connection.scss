@@ -1,0 +1,25 @@
+.edge-hitbox {
+  stroke: transparent;
+  stroke-width: 14;
+  fill: none;
+  cursor: pointer;
+  pointer-events: stroke;
+}
+
+.edge-path {
+  filter: drop-shadow(0 0 4px rgba(33, 150, 243, 0.3));
+  transition: stroke 0.15s ease, stroke-width 0.15s ease;
+  pointer-events: none;
+}
+
+.edge-path:hover {
+  stroke: #2196f3;
+  stroke-width: 3;
+  filter: drop-shadow(0 0 8px #2196f3);
+}
+
+@keyframes dash {
+  to {
+    stroke-dashoffset: -12;
+  }
+}

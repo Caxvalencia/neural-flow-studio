@@ -1,0 +1,244 @@
+.node {
+  position: absolute;
+  min-width: 240px;
+  background: rgba(30, 30, 50, 0.95);
+  border: 1px solid #333;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  transition: all 0.15s ease;
+  z-index: 10;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 12px;
+  color: #e0e0e0;
+}
+
+.node:hover {
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+  transform: translateY(-2px);
+}
+
+.node.selected {
+  border-width: 2px;
+  box-shadow: 0 0 0 2px currentColor, 0 8px 30px rgba(0, 0, 0, 0.5);
+}
+
+.node.dragging {
+  opacity: 0.9;
+  z-index: 100;
+}
+
+.node-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: rgba(0, 0, 0, 0.2);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 12px 12px 0 0;
+  cursor: grab;
+}
+
+.node.dragging .node-header {
+  cursor: grabbing;
+}
+
+.node-type-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.node-icon {
+  color: #8cc9ff;
+  font-size: 20px;
+  font-variation-settings: 'FILL' 1, 'wght' 600, 'GRAD' 0, 'opsz' 24;
+}
+
+.node-label {
+  font-weight: 600;
+  font-size: 13px;
+  color: #fff;
+}
+
+.node-delete {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #888;
+  font-size: 14px;
+  cursor: pointer;
+  opacity: 0;
+  transition: all 0.15s ease;
+}
+
+.node-delete .material-symbols-rounded {
+  font-size: 16px;
+}
+
+.node:hover .node-delete {
+  opacity: 1;
+}
+
+.node-delete:hover {
+  background: rgba(244, 67, 54, 0.2);
+  color: #f44336;
+}
+
+.node-ports {
+  display: flex;
+  min-height: 80px;
+}
+
+.input-ports,
+.output-ports {
+  position: relative;
+  width: 32px;
+  flex-shrink: 0;
+}
+
+.port {
+  position: absolute;
+  left: 0;
+  width: 72px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  transform: translate(-50%, -50%);
+  cursor: crosshair;
+}
+
+.input-port {
+  padding: 0;
+}
+
+.output-port {
+  left: 32px;
+  padding: 0;
+}
+
+.port-dot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #444;
+  border: 2px solid #1a1a2e;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.5);
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+  transform: translate(-50%, -50%);
+}
+
+.node.connection-active .input-port .port-dot {
+  background: #4caf50;
+  box-shadow: 0 0 10px rgba(76, 175, 80, 0.8), 0 0 22px rgba(76, 175, 80, 0.35);
+}
+
+.node.connection-active .input-port .port-label {
+  color: #bdf7c5;
+}
+
+.node.connection-active .output-port .port-dot {
+  background: #2196f3;
+}
+
+.port:hover .port-dot,
+.port:active .port-dot {
+  background: #2196f3;
+  box-shadow: 0 0 12px #2196f3, 0 0 20px #2196f3;
+  transform: translate(-50%, -50%) scale(1.2);
+}
+
+.port-label {
+  font-size: 10px;
+  color: #888;
+  white-space: nowrap;
+  user-select: none;
+  min-width: 30px;
+}
+
+.input-port .port-label {
+  position: absolute;
+  left: calc(50% + 12px);
+  text-align: right;
+}
+
+.output-port .port-label {
+  position: absolute;
+  right: calc(50% + 12px);
+  text-align: left;
+}
+
+.node-body {
+  flex: 1;
+  padding: 12px 14px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.params-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.param-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.param-key {
+  font-size: 11px;
+  color: #888;
+  white-space: nowrap;
+}
+
+.param-value {
+  font-size: 11px;
+  color: #ccc;
+  font-family: 'JetBrains Mono', monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.param-more {
+  font-size: 10px;
+  color: #666;
+  margin-top: 4px;
+}
+
+.no-params {
+  font-size: 11px;
+  color: #666;
+  font-style: italic;
+}
+
+.node-type-badge {
+  position: absolute;
+  bottom: -10px;
+  right: 12px;
+  padding: 2px 8px;
+  font-size: 9px;
+  font-weight: 700;
+  color: #fff;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+@media (max-width: 768px) {
+  .node {
+    min-width: 200px;
+  }
+}

@@ -1,0 +1,93 @@
+<div class="config-panel" *ngIf="node && layerDef()">
+  <div class="panel-header">
+    <div class="node-info">
+      <span class="node-icon material-symbols-rounded">{{ layerDef()?.icon }}</span>
+      <div>
+        <h3>{{ node.label }}</h3>
+        <span class="node-type">{{ layerTypeLabel() }}</span>
+      </div>
+    </div>
+    <button class="close-btn" (click)="close.emit()">
+      <span class="material-symbols-rounded">close</span>
+    </button>
+  </div>
+
+  <div class="panel-description">{{ layerDef()?.description }}</div>
+
+  <div class="params-form" *ngIf="paramDefinitions().length; else noParams">
+    @for (param of paramDefinitions(); track param.key) {
+      <div class="param-field">
+        <label class="param-label">{{ param.label }}</label>
+
+        @switch (param.type) {
+          @case ('number') {
+            <input type="number"
+                   class="param-input"
+                   [min]="param.min"
+                   [max]="param.max"
+                   [step]="param.step || 1"
+                   [placeholder]="param.placeholder"
+                   [value]="params()[param.key] ?? param.defaultValue"
+                   (input)="updateNumberParam(param.key, $any($event.target).value)" />
+          }
+          @case ('select') {
+            <select class="param-select"
+                    [value]="params()[param.key] ?? param.defaultValue"
+                    (change)="updateParam(param.key, $any($event.target).value)">
+              @for (opt of param.options || []; track opt.value) {
+                <option [value]="opt.value">{{ opt.label }}</option>
+              }
+            </select>
+          }
+          @case ('boolean') {
+            <label class="param-checkbox">
+              <input type="checkbox"
+                     [checked]="params()[param.key] ?? param.defaultValue"
+                     (change)="updateParam(param.key, $any($event.target).checked)" />
+              <span class="checkbox-label">Enabled</span>
+            </label>
+          }
+          @case ('array') {
+            <input type="text"
+                   class="param-input"
+                   [placeholder]="param.placeholder || 'Comma-separated values'"
+                   [value]="formatValue(params()[param.key] ?? param.defaultValue)"
+                   (input)="updateArrayParam(param.key, $any($event.target).value)" />
+          }
+          @default {
+            <input type="text"
+                   class="param-input"
+                   [placeholder]="param.placeholder"
+                   [value]="params()[param.key] ?? param.defaultValue"
+                   (input)="updateParam(param.key, $any($event.target).value)" />
+          }
+        }
+
+        @if (param.type === 'number' && (param.min !== undefined || param.max !== undefined)) {
+          <div class="param-range">
+            <span>{{ param.min ?? '−∞' }}</span>
+            <span>{{ param.max ?? '∞' }}</span>
+          </div>
+        }
+      </div>
+    }
+  </div>
+
+  <ng-template #noParams>
+    <div class="no-params">This layer has no configurable parameters.</div>
+  </ng-template>
+
+  <div class="node-actions">
+    <button class="action-btn danger" (click)="deleteNode()">
+      <span class="material-symbols-rounded">delete</span>
+      Delete Node
+    </button>
+  </div>
+</div>
+
+<div class="config-panel-empty" *ngIf="!node">
+  <div class="empty-state">
+    <span class="empty-icon material-symbols-rounded">tune</span>
+    <p>Select a node to configure its parameters</p>
+  </div>
+</div>
