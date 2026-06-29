@@ -30,6 +30,17 @@ La app permite construir modelos por capas, configurar hiperparametros, cargar o
 
 ---
 
+## Caracteristicas
+
+- Canvas visual con grilla punteada, pan con drag y zoom.
+- Plantillas `Dense` y `CNN` para arrancar rapido.
+- Selector de backend TensorFlow.js: WebGPU, WebGL, WASM y CPU.
+- Datasets publicos cargados en caliente: MNIST, Iris y Boston Housing.
+- Tooltips custom para controles, capas y parametros.
+- Exportacion de grafo, modelo JSON y codigo TypeScript.
+
+---
+
 ## Documentacion
 
 La documentacion funcional del proyecto esta en [`docs/`](./docs/README.md):

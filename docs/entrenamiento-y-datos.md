@@ -2,12 +2,33 @@
 
 ## Backend TensorFlow.js
 
-`TfjsService` intenta inicializar TensorFlow.js con WebGPU:
+`TfjsService` permite elegir el backend de TensorFlow.js desde el panel `Train`.
 
-1. `tf.setBackend('webgpu')`
-2. `tf.ready()`
+Backends disponibles:
 
-Si WebGPU no está disponible, usa WebGL como fallback. El panel `Train` muestra el backend activo.
+- `WebGPU`: opción preferida para aceleración moderna en GPU.
+- `WebGL`: fallback GPU compatible con más navegadores.
+- `WASM`: ejecución CPU optimizada con WebAssembly.
+- `CPU`: fallback universal.
+
+Cada preferencia tiene cadena de fallback:
+
+```text
+webgpu -> webgl -> wasm -> cpu
+webgl  -> wasm -> cpu
+wasm   -> cpu
+cpu
+```
+
+El selector muestra backend preferido, backend activo, estado y errores de fallback. El cambio de backend se bloquea mientras hay entrenamiento activo.
+
+Para WASM, Angular copia los binarios desde `node_modules/@tensorflow/tfjs-backend-wasm/dist` hacia:
+
+```text
+assets/tfjs-backend-wasm/
+```
+
+`TfjsService` configura esa ruta con `setWasmPaths('/assets/tfjs-backend-wasm/')`.
 
 ## Validación del grafo
 
@@ -89,6 +110,73 @@ El botón `Generate Sample Data` crea datos aleatorios:
 
 Estos datos sirven para probar el flujo técnico, no para entrenar un modelo útil.
 
+## Datasets públicos
+
+El botón `Load Dataset` abre un modal para cargar datasets remotos compatibles con el modelo visual.
+
+Datasets disponibles:
+
+| Dataset                  | Tipo                      | Input         | Output    | Template | Loss                      |
+| ------------------------ | ------------------------- | ------------- | --------- | -------- | ------------------------- |
+| `MNIST digits - train`   | Clasificación de imágenes | `28 × 28 × 1` | 10 clases | `CNN`    | `categoricalCrossentropy` |
+| `MNIST digits - test`    | Clasificación de imágenes | `28 × 28 × 1` | 10 clases | `CNN`    | `categoricalCrossentropy` |
+| `Iris flowers - train`   | Clasificación tabular     | `4`           | 3 clases  | `Dense`  | `categoricalCrossentropy` |
+| `Iris flowers - test`    | Clasificación tabular     | `4`           | 3 clases  | `Dense`  | `categoricalCrossentropy` |
+| `Boston Housing - train` | Regresión tabular         | `12`          | 1 valor   | `Dense`  | `meanSquaredError`        |
+| `Boston Housing - test`  | Regresión tabular         | `12`          | 1 valor   | `Dense`  | `meanSquaredError`        |
+
+Al cargar un dataset:
+
+1. Se descarga una muestra limitada por `Samples`.
+2. Se carga una plantilla compatible.
+3. Se ajusta el nodo `Input` con el `shape` del dataset.
+4. Se ajusta la capa densa final con unidades y activación de salida.
+5. Se actualiza la configuración de entrenamiento (`loss` y métricas).
+6. Se construye automáticamente el modelo.
+
+### MNIST
+
+MNIST se carga desde los archivos públicos usados por ejemplos de TensorFlow.js:
+
+```text
+https://storage.googleapis.com/learnjs-data/model-builder/mnist_images.png
+https://storage.googleapis.com/learnjs-data/model-builder/mnist_labels_uint8
+```
+
+Las imágenes están en un sprite PNG. El loader:
+
+- Lee el rango elegido del sprite con Canvas 2D.
+- Normaliza pixeles a `0..1`.
+- Devuelve cada imagen como 784 valores, que luego TensorFlow.js reshapea a `[28, 28, 1]`.
+- Lee labels one-hot de 10 clases.
+
+### Iris
+
+Iris se carga desde:
+
+```text
+https://storage.googleapis.com/download.tensorflow.org/data/iris_training.csv
+https://storage.googleapis.com/download.tensorflow.org/data/iris_test.csv
+```
+
+Cada fila contiene 4 features y una clase `0..2`. El loader convierte la clase a one-hot.
+
+### Boston Housing
+
+Boston Housing se carga desde:
+
+```text
+https://storage.googleapis.com/tfjs-examples/multivariate-linear-regression/data/boston-housing-train.csv
+https://storage.googleapis.com/tfjs-examples/multivariate-linear-regression/data/boston-housing-test.csv
+```
+
+El loader:
+
+- Usa las columnas de entrada como features.
+- Normaliza features por columna.
+- Escala el target `medv` dividiéndolo por `50`.
+- Configura salida `linear` y `meanSquaredError`.
+
 ## Configuración de entrenamiento
 
 El panel permite modificar:
@@ -101,6 +189,8 @@ El panel permite modificar:
 - `Loss`: `categoricalCrossentropy`, `binaryCrossentropy`, `meanSquaredError` o `sparseCategoricalCrossentropy`.
 
 Las métricas registradas por defecto incluyen `accuracy`.
+
+Para datasets de regresión, como Boston Housing, las métricas se dejan vacías y se prioriza `loss` / `val_loss`.
 
 ## Entrenamiento
 
@@ -133,9 +223,12 @@ Hay tres exportaciones distintas:
 
 Si el grafo tiene errores, `Export TS` devuelve un archivo con comentarios indicando qué se debe corregir antes de exportar un modelo válido.
 
+El código exportado acepta un backend preferido y usa fallback entre WebGPU, WebGL, WASM y CPU.
+
 ## Limitaciones actuales
 
 - El entrenamiento soporta un único tensor de entrada y un único tensor de salida.
 - El generador de datos produce datos sintéticos aleatorios.
 - `stopTraining` crea un `AbortController`, pero TensorFlow.js `model.fit` no se interrumpe automáticamente con esa señal en la implementación actual.
 - La salida de entrenamiento se infiere desde el primer nodo no-input sin conexiones salientes.
+- Los datasets remotos dependen de conectividad y de que las rutas públicas mantengan CORS habilitado.

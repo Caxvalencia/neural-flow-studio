@@ -4,17 +4,19 @@
 
 La aplicación está en `src/app` y se divide en componentes, servicios y modelos.
 
-| Archivo | Responsabilidad |
-| --- | --- |
-| `app.ts` / `app.html` | Shell principal, panel activo, acciones globales y atajos. |
-| `canvas/*` | Render del board, pan/zoom, drag-and-drop de capas, conexiones SVG. |
-| `node/*` | Render de cada nodo, puertos, selección, drag de nodos y eventos de puerto. |
-| `config-panel/*` | Edición de parámetros del nodo seleccionado. |
-| `train-panel/*` | Datos, construcción, entrenamiento, métricas y exportación del modelo. |
-| `services/graph.service.ts` | Estado del grafo, nodos, conexiones, autosave, plantillas e import/export. |
-| `services/tfjs.service.ts` | Validación, construcción, entrenamiento, predicción y exportación TensorFlow.js. |
-| `models/graph.model.ts` | Tipos base: nodo, puerto, edge y estado de conexión. |
-| `models/layer-types.ts` | Catálogo de capas disponibles y sus parámetros. |
+| Archivo                       | Responsabilidad                                                                  |
+| ----------------------------- | -------------------------------------------------------------------------------- |
+| `app.ts` / `app.html`         | Shell principal, panel activo, acciones globales y atajos.                       |
+| `canvas/*`                    | Render del board, pan/zoom, drag-and-drop de capas, conexiones SVG.              |
+| `node/*`                      | Render de cada nodo, puertos, selección, drag de nodos y eventos de puerto.      |
+| `config-panel/*`              | Edición de parámetros del nodo seleccionado.                                     |
+| `train-panel/*`               | Datos, construcción, entrenamiento, métricas y exportación del modelo.           |
+| `services/graph.service.ts`   | Estado del grafo, nodos, conexiones, autosave, plantillas e import/export.       |
+| `services/tfjs.service.ts`    | Validación, construcción, entrenamiento, predicción y exportación TensorFlow.js. |
+| `services/dataset.service.ts` | Catálogo y loaders de datasets públicos remotos.                                 |
+| `shared/tooltip.directive.ts` | Tooltips custom para elementos con `title`.                                      |
+| `models/graph.model.ts`       | Tipos base: nodo, puerto, edge y estado de conexión.                             |
+| `models/layer-types.ts`       | Catálogo de capas disponibles y sus parámetros.                                  |
 
 ## Modelo de datos
 
@@ -60,18 +62,28 @@ Los componentes no mutan el estado directamente. Envían eventos a `GraphService
 
 ## Canvas y coordenadas
 
-El canvas usa dos capas principales:
+El canvas usa tres capas principales:
 
+- `.grid-overlay`: SVG con grilla punteada.
 - `.nodes-layer`: contiene los componentes `app-node`.
 - `.connection-overlay`: SVG que dibuja las líneas.
 
-Ambas capas reciben el mismo transform CSS:
+Las tres capas reciben el mismo transform CSS:
 
 ```text
 translate(x, y) scale(scale)
 ```
 
 Esto mantiene sincronizados nodos y conexiones durante pan y zoom.
+
+La navegación se maneja en `CanvasComponent`:
+
+- `Wheel` hace pan.
+- `Shift + Wheel` prioriza pan horizontal.
+- `Ctrl/Cmd + Wheel` hace zoom centrado en el cursor.
+- `Pointer drag` sobre un área vacía hace pan manual.
+
+Para evitar que un drag de pan seleccione/deseleccione por accidente, el componente marca `panMoved` y descarta el click siguiente si hubo movimiento.
 
 ## Conexiones visuales
 
@@ -118,3 +130,79 @@ La detección de ciclos recorre desde el target hacia adelante. Si encuentra el 
 - `cnn-classifier`: entrada de imagen, convolución, pooling, flatten y salida softmax.
 
 Después de cargar una plantilla se hace `resetCanvas` para volver a zoom y posición iniciales.
+
+## Toolbar del board
+
+Las acciones que afectan directamente al board viven sobre el canvas en una toolbar inferior:
+
+- Cargar plantilla `Dense`.
+- Cargar plantilla `CNN`.
+- Duplicar o eliminar nodo seleccionado.
+- Restaurar autosave.
+- Limpiar autosave.
+- Abrir atajos.
+- Limpiar el grafo.
+
+Las acciones de archivo (`Import graph`, `Export graph`) permanecen en el topbar.
+
+## Tooltips
+
+`TooltipDirective` usa el selector `[title]` y reemplaza el tooltip nativo del navegador:
+
+1. Captura el texto de `title` mediante `@Input('title')`.
+2. Elimina el atributo nativo con `@HostBinding('attr.title') = null`.
+3. En `mouseenter` o `focusin`, crea un `.app-tooltip` en `document.body`.
+4. Calcula posición sobre o debajo del elemento según espacio disponible.
+5. Destruye el tooltip en `mouseleave`, `focusout`, `scroll`, `resize` o `ngOnDestroy`.
+
+Los estilos globales están en `src/styles.scss`.
+
+## Backends TensorFlow.js
+
+`TfjsService` mantiene signals para:
+
+- Backend preferido.
+- Backend activo.
+- Estado (`initializing`, `ready`, `fallback`, `error`).
+- Mensaje y error de backend.
+- Estado de cambio en curso.
+
+El servicio configura WASM con:
+
+```ts
+setWasmPaths('/assets/tfjs-backend-wasm/');
+```
+
+`angular.json` copia los binarios `.wasm` desde `node_modules/@tensorflow/tfjs-backend-wasm/dist` a `assets/tfjs-backend-wasm`.
+
+## Datasets
+
+`DatasetService` expone un catálogo de `DatasetDefinition` con:
+
+- `id`
+- `name`
+- `description`
+- `source`
+- `inputShape`
+- `outputClasses`
+- `defaultSamples`
+- `maxSamples`
+- `template`
+- `kind`
+- `outputActivation`
+- `loss`
+- `metrics`
+
+El servicio soporta tres tipos de loader:
+
+- `mnist`: carga sprite PNG + labels binarios one-hot.
+- `iris`: carga CSV y convierte la clase a one-hot.
+- `boston-housing`: carga CSV, normaliza features y escala target.
+
+`TrainPanelComponent` usa esa definición para:
+
+1. Descargar datos.
+2. Cargar plantilla compatible.
+3. Ajustar `Input` y salida.
+4. Actualizar configuración de entrenamiento.
+5. Construir el modelo.
