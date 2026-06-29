@@ -55,6 +55,49 @@
   color: #4caf50;
 }
 
+.backend-badge.fallback {
+  background: rgba(255, 152, 0, 0.18);
+  color: #ffb74d;
+}
+
+.backend-badge.error {
+  background: rgba(244, 67, 54, 0.18);
+  color: #ff8a80;
+}
+
+.backend-control {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.backend-control label {
+  font-size: 11px;
+  color: #888;
+}
+
+.backend-control .param-select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.3);
+  color: #fff;
+  font-size: 12px;
+}
+
+.backend-control .param-select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.backend-error {
+  margin: 8px 0 0;
+  color: #ff8a80;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
 .data-format-tabs {
   display: flex;
   gap: 4px;
@@ -276,10 +319,18 @@
   border-radius: 2px;
 }
 
-.legend-color.loss { background: #f44336; }
-.legend-color.val-loss { background: #ff9800; }
-.legend-color.acc { background: #4caf50; }
-.legend-color.val-acc { background: #8bc34a; }
+.legend-color.loss {
+  background: #f44336;
+}
+.legend-color.val-loss {
+  background: #ff9800;
+}
+.legend-color.acc {
+  background: #4caf50;
+}
+.legend-color.val-acc {
+  background: #8bc34a;
+}
 
 .training-actions {
   display: flex;

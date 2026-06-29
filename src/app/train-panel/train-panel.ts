@@ -1,7 +1,8 @@
-import { Component, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { TfjsService, TrainingConfig, TrainingData } from '../services/tfjs.service';
+
+import { TfjsBackend, TfjsService, TrainingConfig, TrainingData } from '../services/tfjs.service';
 
 @Component({
   selector: 'app-train-panel',
@@ -34,8 +35,15 @@ export class TrainPanelComponent {
   trainingMetrics = this.tfjsService.trainingMetrics;
   currentEpoch = this.tfjsService.currentEpoch;
   webgpuReady = this.tfjsService.webgpuReady;
+  backendOptions = this.tfjsService.backendOptions;
+  preferredBackend = this.tfjsService.preferredBackend;
+  activeBackend = this.tfjsService.activeBackend;
+  backendStatus = this.tfjsService.backendStatus;
+  backendMessage = this.tfjsService.backendMessage;
+  backendError = this.tfjsService.backendError;
+  backendSwitching = this.tfjsService.backendSwitching;
   modelErrors = this.tfjsService.modelErrors;
-  backend = computed(() => this.tfjsService.getBackend());
+  backend = computed(() => this.activeBackend());
 
   modelSummary = signal('');
 
@@ -64,7 +72,7 @@ export class TrainPanelComponent {
   maxLoss = computed(() => {
     const metrics = this.trainingMetrics();
     if (!metrics.length) return 1;
-    return Math.max(...metrics.map(m => m.loss), ...metrics.map(m => m.valLoss || 0)) * 1.1;
+    return Math.max(...metrics.map((m) => m.loss), ...metrics.map((m) => m.valLoss || 0)) * 1.1;
   });
 
   shapeInfo = computed(() => this.tfjsService.getTrainingShapeInfo());
@@ -83,23 +91,30 @@ export class TrainPanelComponent {
     if (!text) return;
 
     try {
-      const lines = text.split('\n').filter(l => l.trim());
-      const data: number[][] = lines.map(line =>
-        line.split(',').map(v => parseFloat(v.trim())).filter(v => !isNaN(v))
-      ).filter(row => row.length > 0);
+      const lines = text.split('\n').filter((l) => l.trim());
+      const data: number[][] = lines
+        .map((line) =>
+          line
+            .split(',')
+            .map((v) => parseFloat(v.trim()))
+            .filter((v) => !isNaN(v)),
+        )
+        .filter((row) => row.length > 0);
 
       if (data.length === 0) return;
 
       const { inputSize, outputSize } = this.shapeInfo();
       const expectedColumns = inputSize + outputSize;
-      const invalidRow = data.findIndex(row => row.length !== expectedColumns);
+      const invalidRow = data.findIndex((row) => row.length !== expectedColumns);
       if (invalidRow >= 0) {
-        alert(`CSV row ${invalidRow + 1} must have ${expectedColumns} columns (${inputSize} inputs + ${outputSize} outputs).`);
+        alert(
+          `CSV row ${invalidRow + 1} must have ${expectedColumns} columns (${inputSize} inputs + ${outputSize} outputs).`,
+        );
         return;
       }
 
-      const x = data.map(row => row.slice(0, inputSize));
-      const y = data.map(row => row.slice(inputSize, inputSize + outputSize));
+      const x = data.map((row) => row.slice(0, inputSize));
+      const y = data.map((row) => row.slice(inputSize, inputSize + outputSize));
 
       this.trainingData.set({ x, y });
     } catch (e) {
@@ -118,15 +133,15 @@ export class TrainPanelComponent {
 
     for (let i = 0; i < samples; i++) {
       const input = Array.from({ length: inputSize }, () => Math.random() * 2 - 1);
-      const target = Array.from({ length: outputSize }, (_, j) => j === Math.floor(Math.random() * outputSize) ? 1 : 0);
+      const target = Array.from({ length: outputSize }, (_, j) =>
+        j === Math.floor(Math.random() * outputSize) ? 1 : 0,
+      );
       x.push(input);
       y.push(target);
     }
 
     this.trainingData.set({ x, y });
-    this.dataInput.set(
-      x.map((row, i) => [...row, ...y[i]].join(',')).join('\n')
-    );
+    this.dataInput.set(x.map((row, i) => [...row, ...y[i]].join(',')).join('\n'));
   }
 
   updateManualData() {
@@ -152,8 +167,17 @@ export class TrainPanelComponent {
     this.tfjsService.stopTraining();
   }
 
+  async changeBackend(backend: TfjsBackend) {
+    try {
+      await this.tfjsService.setBackendPreference(backend);
+    } catch (e) {
+      console.error('Backend change failed:', e);
+      alert('Backend change failed: ' + (e as Error).message);
+    }
+  }
+
   updateConfig(key: keyof TrainingConfig, value: any) {
-    this.config.update(c => ({ ...c, [key]: value }));
+    this.config.update((c) => ({ ...c, [key]: value }));
   }
 
   getProgress(): number {
@@ -194,16 +218,18 @@ export class TrainPanelComponent {
 
     const width = 300;
     const height = 150;
-    const values = metrics.map(metric => metric[metricKey] ?? 0);
+    const values = metrics.map((metric) => metric[metricKey] ?? 0);
     const max = Math.max(...values, 1);
     const min = Math.min(...values, 0);
     const range = max - min || 1;
 
-    return values.map((value, index) => {
-      const x = (index / (values.length - 1)) * width;
-      const y = height - ((value - min) / range) * height;
-      return `${x},${y}`;
-    }).join(' ');
+    return values
+      .map((value, index) => {
+        const x = (index / (values.length - 1)) * width;
+        const y = height - ((value - min) / range) * height;
+        return `${x},${y}`;
+      })
+      .join(' ');
   }
 
   formatNumber(n: number | null): string {

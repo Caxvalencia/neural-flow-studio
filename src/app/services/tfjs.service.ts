@@ -1,9 +1,19 @@
 import { Injectable, signal, computed } from '@angular/core';
 import * as tf from '@tensorflow/tfjs';
 import '@tensorflow/tfjs-backend-webgpu';
+import { setWasmPaths } from '@tensorflow/tfjs-backend-wasm';
 import { GraphService } from './graph.service';
 import { getLayerTypeDef } from '../models/layer-types';
 import { GraphNode, Edge } from '../models/graph.model';
+
+export type TfjsBackend = 'webgpu' | 'webgl' | 'wasm' | 'cpu';
+export type BackendStatus = 'initializing' | 'ready' | 'fallback' | 'error';
+
+export interface BackendOption {
+  id: TfjsBackend;
+  label: string;
+  description: string;
+}
 
 export interface TrainingConfig {
   epochs: number;
@@ -44,53 +54,132 @@ const DEFAULT_TRAINING_CONFIG: TrainingConfig = {
   metrics: ['accuracy'],
 };
 
+const BACKEND_OPTIONS: BackendOption[] = [
+  {
+    id: 'webgpu',
+    label: 'WebGPU',
+    description: 'GPU moderna, mejor para modelos medianos/grandes.',
+  },
+  { id: 'webgl', label: 'WebGL', description: 'GPU compatible con la mayoria de navegadores.' },
+  { id: 'wasm', label: 'WASM', description: 'CPU optimizada en WebAssembly.' },
+  { id: 'cpu', label: 'CPU', description: 'Fallback universal, mas lento pero estable.' },
+];
+
+const BACKEND_FALLBACKS: Record<TfjsBackend, TfjsBackend[]> = {
+  webgpu: ['webgpu', 'webgl', 'wasm', 'cpu'],
+  webgl: ['webgl', 'wasm', 'cpu'],
+  wasm: ['wasm', 'cpu'],
+  cpu: ['cpu'],
+};
+
 @Injectable({ providedIn: 'root' })
 export class TfjsService {
-  private _webgpuReady = signal(false);
+  readonly backendOptions = BACKEND_OPTIONS;
+
+  private _preferredBackend = signal<TfjsBackend>('webgpu');
+  private _activeBackend = signal<string>(tf.getBackend());
+  private _backendStatus = signal<BackendStatus>('initializing');
+  private _backendMessage = signal('Initializing WebGPU backend...');
+  private _backendError = signal<string | null>(null);
+  private _backendSwitching = signal(false);
   private _training = signal(false);
   private _trainingMetrics = signal<TrainingMetrics[]>([]);
   private _currentEpoch = signal(0);
   private _modelErrors = signal<string[]>([]);
   private _model: tf.LayersModel | null = null;
   private _trainingAbortController: AbortController | null = null;
+  private backendRequestId = 0;
 
-  webgpuReady = computed(() => this._webgpuReady());
+  preferredBackend = computed(() => this._preferredBackend());
+  activeBackend = computed(() => this._activeBackend());
+  backendStatus = computed(() => this._backendStatus());
+  backendMessage = computed(() => this._backendMessage());
+  backendError = computed(() => this._backendError());
+  backendSwitching = computed(() => this._backendSwitching());
+  webgpuReady = computed(() => this._activeBackend() === 'webgpu');
   training = computed(() => this._training());
   trainingMetrics = computed(() => this._trainingMetrics());
   currentEpoch = computed(() => this._currentEpoch());
   modelErrors = computed(() => this._modelErrors());
 
   constructor(private graphService: GraphService) {
-    this.initWebGPU();
+    this.configureWasmBackend();
+    void this.setBackendPreference('webgpu');
   }
 
-  private async initWebGPU() {
-    try {
-      await tf.setBackend('webgpu');
-      await tf.ready();
-      this._webgpuReady.set(true);
-      console.log('WebGPU backend initialized');
-    } catch (e) {
-      console.warn('WebGPU not available, falling back to WebGL:', e);
+  private configureWasmBackend() {
+    setWasmPaths('/assets/tfjs-backend-wasm/');
+  }
+
+  async setBackendPreference(preferredBackend: TfjsBackend): Promise<void> {
+    if (this._training()) {
+      throw new Error('Cannot change backend while training is running.');
+    }
+
+    const requestId = ++this.backendRequestId;
+    this._preferredBackend.set(preferredBackend);
+    this._backendSwitching.set(true);
+    this._backendStatus.set('initializing');
+    this._backendMessage.set(`Initializing ${this.getBackendLabel(preferredBackend)} backend...`);
+    this._backendError.set(null);
+
+    const failures: string[] = [];
+
+    for (const backend of BACKEND_FALLBACKS[preferredBackend]) {
       try {
-        await tf.setBackend('webgl');
+        await tf.setBackend(backend);
         await tf.ready();
-        this._webgpuReady.set(false);
-        console.log('WebGL backend initialized');
-      } catch (e2) {
-        console.error('Failed to initialize any backend:', e2);
+
+        if (requestId !== this.backendRequestId) return;
+
+        this._activeBackend.set(tf.getBackend());
+        this._backendStatus.set(backend === preferredBackend ? 'ready' : 'fallback');
+        this._backendMessage.set(
+          backend === preferredBackend
+            ? `${this.getBackendLabel(backend)} backend active.`
+            : `${this.getBackendLabel(preferredBackend)} is unavailable. Using ${this.getBackendLabel(backend)} fallback.`,
+        );
+        this._backendError.set(failures.length ? failures.join(' ') : null);
+        this._backendSwitching.set(false);
+        console.log(`${this.getBackendLabel(backend)} backend initialized`);
+        return;
+      } catch (error) {
+        failures.push(`${this.getBackendLabel(backend)}: ${(error as Error).message}`);
       }
+    }
+
+    if (requestId === this.backendRequestId) {
+      this._backendStatus.set('error');
+      this._backendMessage.set('No TensorFlow.js backend could be initialized.');
+      this._backendError.set(failures.join(' '));
+      this._backendSwitching.set(false);
     }
   }
 
+  private getBackendLabel(backend: string): string {
+    return BACKEND_OPTIONS.find((option) => option.id === backend)?.label ?? backend.toUpperCase();
+  }
+
+  async retryBackend(): Promise<void> {
+    await this.setBackendPreference(this._preferredBackend());
+  }
+
+  isBackendAvailable(backend: TfjsBackend): boolean {
+    return tf.findBackend(backend) != null;
+  }
+
+  getBackendOption(backend: TfjsBackend): BackendOption {
+    return BACKEND_OPTIONS.find((option) => option.id === backend) ?? BACKEND_OPTIONS[0];
+  }
+
   getBackend(): string {
-    return tf.getBackend();
+    return this._activeBackend();
   }
 
   getTrainingShapeInfo(): TrainingShapeInfo {
     const nodes = this.graphService.nodes();
     const edges = this.graphService.edges();
-    const inputNode = nodes.find(node => node.type === 'input');
+    const inputNode = nodes.find((node) => node.type === 'input');
     const outputNode = this.findOutputNodes(nodes, edges)[0];
     const inputShape = this.normalizeShape(inputNode?.params['shape'] ?? [4]);
 
@@ -116,7 +205,7 @@ export class TfjsService {
       return null;
     }
 
-    const inputNodes = nodes.filter(n => n.type === 'input');
+    const inputNodes = nodes.filter((n) => n.type === 'input');
     if (inputNodes.length === 0) {
       this._modelErrors.set(['Add an Input node before building the model.']);
       return null;
@@ -136,9 +225,9 @@ export class TfjsService {
         const def = getLayerTypeDef(node.type);
         if (!def) continue;
 
-        const incomingEdges = edges.filter(e => e.targetNodeId === node.id);
+        const incomingEdges = edges.filter((e) => e.targetNodeId === node.id);
         const sourceTensors = incomingEdges
-          .map(e => nodeToLayer.get(e.sourceNodeId))
+          .map((e) => nodeToLayer.get(e.sourceNodeId))
           .filter((t): t is tf.SymbolicTensor => t !== undefined);
 
         let layer: tf.layers.Layer;
@@ -238,7 +327,10 @@ export class TfjsService {
               });
               break;
             case 'reshape':
-              layer = tf.layers.reshape({ targetShape: node.params.targetShape || [10], name: node.id });
+              layer = tf.layers.reshape({
+                targetShape: node.params.targetShape || [10],
+                name: node.id,
+              });
               break;
             case 'embedding':
               layer = tf.layers.embedding({
@@ -265,11 +357,11 @@ export class TfjsService {
       }
 
       const inputTensors = inputNodes
-        .map(n => nodeToLayer.get(n.id))
+        .map((n) => nodeToLayer.get(n.id))
         .filter((t): t is tf.SymbolicTensor => t !== undefined);
 
       const outputTensors = outputNodes
-        .map(n => nodeToLayer.get(n.id))
+        .map((n) => nodeToLayer.get(n.id))
         .filter((t): t is tf.SymbolicTensor => t !== undefined);
 
       if (inputTensors.length === 0 || outputTensors.length === 0) {
@@ -298,14 +390,18 @@ export class TfjsService {
       return ['Add at least one input layer and one trainable/output layer.'];
     }
 
-    const inputNodes = nodes.filter(node => node.type === 'input');
+    const inputNodes = nodes.filter((node) => node.type === 'input');
     if (inputNodes.length === 0) {
       errors.push('Add an Input node before building the model.');
     }
 
     for (const inputNode of inputNodes) {
       const shape = inputNode.params['shape'];
-      if (!Array.isArray(shape) || shape.length === 0 || shape.some(value => !Number.isFinite(value) || value <= 0)) {
+      if (
+        !Array.isArray(shape) ||
+        shape.length === 0 ||
+        shape.some((value) => !Number.isFinite(value) || value <= 0)
+      ) {
         errors.push(`${inputNode.label} requires a valid positive shape, e.g. 4 or 28,28,1.`);
       }
     }
@@ -318,12 +414,12 @@ export class TfjsService {
     for (const node of nodes) {
       if (node.type === 'input') continue;
 
-      const incoming = edges.filter(edge => edge.targetNodeId === node.id);
+      const incoming = edges.filter((edge) => edge.targetNodeId === node.id);
       if (incoming.length === 0) {
         errors.push(`${node.label} is missing an input connection.`);
       }
 
-      const connectedTargetPorts = new Set(incoming.map(edge => edge.targetPortId));
+      const connectedTargetPorts = new Set(incoming.map((edge) => edge.targetPortId));
       for (const port of node.inputPorts) {
         if (!connectedTargetPorts.has(port.id)) {
           errors.push(`${node.label} input "${port.label}" is not connected.`);
@@ -339,12 +435,12 @@ export class TfjsService {
   }
 
   private findOutputNodes(nodes: GraphNode[], edges: Edge[]): GraphNode[] {
-    const hasOutgoing = new Set(edges.map(e => e.sourceNodeId));
-    return nodes.filter(n => !hasOutgoing.has(n.id) && n.type !== 'input');
+    const hasOutgoing = new Set(edges.map((e) => e.sourceNodeId));
+    return nodes.filter((n) => !hasOutgoing.has(n.id) && n.type !== 'input');
   }
 
   private topologicalSort(nodes: GraphNode[], edges: Edge[]): GraphNode[] {
-    const nodeMap = new Map(nodes.map(n => [n.id, n]));
+    const nodeMap = new Map(nodes.map((n) => [n.id, n]));
     const inDegree = new Map<string, number>();
     const adjList = new Map<string, string[]>();
 
@@ -394,7 +490,7 @@ export class TfjsService {
 
   async train(
     trainingData: TrainingData,
-    config: Partial<TrainingConfig> = {}
+    config: Partial<TrainingConfig> = {},
   ): Promise<TrainingMetrics[]> {
     const model = this.buildModelFromGraph();
     if (!model) throw new Error('Failed to build model');
@@ -437,13 +533,16 @@ export class TfjsService {
             this._currentEpoch.set(epoch + 1);
           },
           onEpochEnd: (epoch, logs) => {
-            this._trainingMetrics.update(prev => [...prev, {
-              epoch: epoch + 1,
-              loss: logs?.['loss'] || 0,
-              valLoss: logs?.['val_loss'] || null,
-              accuracy: logs?.['accuracy'] || logs?.['acc'] || null,
-              valAccuracy: logs?.['val_accuracy'] || logs?.['val_acc'] || null,
-            }]);
+            this._trainingMetrics.update((prev) => [
+              ...prev,
+              {
+                epoch: epoch + 1,
+                loss: logs?.['loss'] || 0,
+                valLoss: logs?.['val_loss'] || null,
+                accuracy: logs?.['accuracy'] || logs?.['acc'] || null,
+                valAccuracy: logs?.['val_accuracy'] || logs?.['val_acc'] || null,
+              },
+            ]);
           },
         },
       });
@@ -495,7 +594,7 @@ export class TfjsService {
     const tensor = tf.tensor(inputData.flat(), [inputData.length, ...shapeInfo.inputShape]);
     const prediction = this._model.predict(tensor) as tf.Tensor;
     try {
-      const result = await prediction.array() as number[][];
+      const result = (await prediction.array()) as number[][];
       return result;
     } finally {
       tensor.dispose();
@@ -514,7 +613,7 @@ export class TfjsService {
     const errors = this.validateGraph(nodes, edges);
 
     if (errors.length) {
-      return `// Fix graph validation errors before exporting model code:\n${errors.map(error => `// - ${error}`).join('\n')}`;
+      return `// Fix graph validation errors before exporting model code:\n${errors.map((error) => `// - ${error}`).join('\n')}`;
     }
 
     const sortedNodes = this.topologicalSort(nodes, edges);
@@ -523,10 +622,33 @@ export class TfjsService {
     const lines: string[] = [
       "import * as tf from '@tensorflow/tfjs';",
       "import '@tensorflow/tfjs-backend-webgpu';",
+      "import { setWasmPaths } from '@tensorflow/tfjs-backend-wasm';",
       '',
-      'export async function createModel() {',
-      "  await tf.setBackend('webgpu');",
-      '  await tf.ready();',
+      "type TfjsBackend = 'webgpu' | 'webgl' | 'wasm' | 'cpu';",
+      '',
+      'const FALLBACKS: Record<TfjsBackend, TfjsBackend[]> = {',
+      "  webgpu: ['webgpu', 'webgl', 'wasm', 'cpu'],",
+      "  webgl: ['webgl', 'wasm', 'cpu'],",
+      "  wasm: ['wasm', 'cpu'],",
+      "  cpu: ['cpu'],",
+      '};',
+      '',
+      'async function setPreferredBackend(preferredBackend: TfjsBackend) {',
+      "  setWasmPaths('/assets/tfjs-backend-wasm/');",
+      '  for (const backend of FALLBACKS[preferredBackend]) {',
+      '    try {',
+      '      await tf.setBackend(backend);',
+      '      await tf.ready();',
+      '      return backend;',
+      '    } catch {',
+      '      continue;',
+      '    }',
+      '  }',
+      "  throw new Error('No TensorFlow.js backend could be initialized.');",
+      '}',
+      '',
+      "export async function createModel(preferredBackend: TfjsBackend = 'webgpu') {",
+      '  await setPreferredBackend(preferredBackend);',
       '',
     ];
 
@@ -535,24 +657,40 @@ export class TfjsService {
       varByNodeId.set(node.id, varName);
 
       if (node.type === 'input') {
-        lines.push(`  const ${varName} = tf.input({ shape: ${JSON.stringify(this.normalizeShape(node.params['shape']))} });`);
+        lines.push(
+          `  const ${varName} = tf.input({ shape: ${JSON.stringify(this.normalizeShape(node.params['shape']))} });`,
+        );
         continue;
       }
 
-      const incoming = edges.filter(edge => edge.targetNodeId === node.id);
-      const sourceVars = incoming.map(edge => varByNodeId.get(edge.sourceNodeId)).filter(Boolean) as string[];
+      const incoming = edges.filter((edge) => edge.targetNodeId === node.id);
+      const sourceVars = incoming
+        .map((edge) => varByNodeId.get(edge.sourceNodeId))
+        .filter(Boolean) as string[];
       const layerFactory = this.layerFactoryCode(node);
 
       if (node.type === 'concatenate') {
-        lines.push(`  const ${varName} = ${layerFactory}.apply([${sourceVars.join(', ')}]) as tf.SymbolicTensor;`);
+        lines.push(
+          `  const ${varName} = ${layerFactory}.apply([${sourceVars.join(', ')}]) as tf.SymbolicTensor;`,
+        );
       } else {
-        lines.push(`  const ${varName} = ${layerFactory}.apply(${sourceVars[0]}) as tf.SymbolicTensor;`);
+        lines.push(
+          `  const ${varName} = ${layerFactory}.apply(${sourceVars[0]}) as tf.SymbolicTensor;`,
+        );
       }
     }
 
-    const inputs = nodes.filter(node => node.type === 'input').map(node => varByNodeId.get(node.id)).filter(Boolean);
-    const outputs = outputNodes.map(node => varByNodeId.get(node.id)).filter(Boolean);
-    lines.push('', `  const model = tf.model({ inputs: [${inputs.join(', ')}], outputs: [${outputs.join(', ')}] });`, '  return model;', '}');
+    const inputs = nodes
+      .filter((node) => node.type === 'input')
+      .map((node) => varByNodeId.get(node.id))
+      .filter(Boolean);
+    const outputs = outputNodes.map((node) => varByNodeId.get(node.id)).filter(Boolean);
+    lines.push(
+      '',
+      `  const model = tf.model({ inputs: [${inputs.join(', ')}], outputs: [${outputs.join(', ')}] });`,
+      '  return model;',
+      '}',
+    );
 
     return lines.join('\n');
   }
@@ -563,7 +701,9 @@ export class TfjsService {
 
   private normalizeShape(shape: unknown): number[] {
     if (!Array.isArray(shape)) return [4];
-    const normalized = shape.map(value => Number(value)).filter(value => Number.isFinite(value) && value > 0);
+    const normalized = shape
+      .map((value) => Number(value))
+      .filter((value) => Number.isFinite(value) && value > 0);
     return normalized.length ? normalized : [4];
   }
 
@@ -608,7 +748,10 @@ export class TfjsService {
   }
 
   private toVariableName(label: string, index: number): string {
-    const safe = label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    const safe = label
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '');
     return `${safe || 'layer'}_${index}`;
   }
 
@@ -618,9 +761,11 @@ export class TfjsService {
 
   private validateTrainingDataRows(rows: number[][], expectedSize: number, label: string) {
     if (!rows.length) throw new Error(`No ${label} rows provided.`);
-    const invalidRow = rows.findIndex(row => row.length !== expectedSize);
+    const invalidRow = rows.findIndex((row) => row.length !== expectedSize);
     if (invalidRow >= 0) {
-      throw new Error(`Invalid ${label} row ${invalidRow + 1}: expected ${expectedSize} values, got ${rows[invalidRow].length}.`);
+      throw new Error(
+        `Invalid ${label} row ${invalidRow + 1}: expected ${expectedSize} values, got ${rows[invalidRow].length}.`,
+      );
     }
   }
 

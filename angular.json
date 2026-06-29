@@ -27,6 +27,11 @@
               {
                 "glob": "**/*",
                 "input": "public"
+              },
+              {
+                "glob": "*.wasm",
+                "input": "node_modules/@tensorflow/tfjs-backend-wasm/dist",
+                "output": "assets/tfjs-backend-wasm"
               }
             ],
             "styles": [
